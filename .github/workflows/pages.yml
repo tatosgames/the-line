@@ -1,9 +1,9 @@
-# Publishes main to GitHub Pages, so testers always have the latest version at one link.
+# Publishes the Pixi playtest branch at a stable link.
 name: Deploy to GitHub Pages
 
 on:
   push:
-    branches: [main]
+    branches: [feat/pixi-port]
   workflow_dispatch:
 
 permissions:

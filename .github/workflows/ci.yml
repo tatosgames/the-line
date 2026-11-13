@@ -2,8 +2,9 @@ name: CI
 
 on:
   push:
-    branches: [main]
+    branches: ['**']
   pull_request:
+  workflow_dispatch:
 
 jobs:
   check:
@@ -23,3 +24,4 @@ jobs:
         with:
           name: the-line-web
           path: dist
+          if-no-files-found: error
