@@ -5,6 +5,8 @@ import { DIFF, levelStart } from '../src/data/difficulty';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { Controls, Input } from '../src/core/input';
 import { sfx } from '../src/core/sfx';
+import { fitGameArea } from '../src/core/input-layout';
+import { Neon, VIEW_H } from '../src/core/neon';
 import { STYLES } from '../src/core/styles';
 import { METERS } from '../src/core/music';
 import { I } from '../src/data/anim';
@@ -100,6 +102,58 @@ describe('the simulation', () => {
 
   it('is exact: the same seed and keys give the same game', () => {
     expect(play(7)).toEqual(play(7));
+  });
+
+  it('replays a fall identically across different draw cadences', () => {
+    function replay(drawEvery: number) {
+      Math.random = seeded(19);
+      const g = headlessGame();
+      const n = g.neon;
+      Object.assign(n, { canvas: { clientWidth: n.w, clientHeight: n.h }, fullW: n.w, fullH: n.h, glow() {} });
+      g.start();
+      g.wavell.state = 'ground';
+      g.wavell.kill('fall');
+      n.shake = 2;
+      for (let i = 0; i < 140; i++) {
+        g.tick(IDLE);
+        if (i % drawEvery === 0) {
+          Neon.prototype.prepareFrame.call(n, drawEvery / 120);
+          g.wavell.drawFeatures(n, g.line);
+        }
+      }
+      return { endX: g.endX, lives: g.lives, nextRandom: Math.random() };
+    }
+    expect(replay(1)).toEqual(replay(4));
+  });
+
+  it('keeps the Sinepede and Worm entrances at the same distance after a portrait rotation', () => {
+    function replay(rotate: boolean) {
+      Math.random = seeded(23);
+      const g = headlessGame();
+      g.start();
+      g.wavell.state = 'ground';
+      g.tick(IDLE);
+      if (rotate) {
+        const crop = fitGameArea(390, 844);
+        Object.assign(g.neon, { viewW: crop.w / (crop.h / VIEW_H) });
+      }
+      g.herald = { steps: 1, due: true, beats: null, count: 1, speed: 80, side: 1 };
+      g.tick(IDLE);
+      const sine = g.sinepedes[0].x;
+      g.sinepedes.length = 0;
+      // Use the same fixed step while forcing the next spawn cue to the Worm.
+      g.playTime = DIFF.wormFrom;
+      const spawn = g as unknown as { calm: number; wormClock: number; takes(kind: string): boolean };
+      spawn.calm = 0;
+      spawn.wormClock = DIFF.wormEvery;
+      vi.spyOn(spawn, 'takes').mockImplementation((kind) => kind === 'worm');
+      g.tick(IDLE);
+      return { sine, worm: g.worms[0].x, camera: g.neon.camX };
+    }
+    const landscape = replay(false), portrait = replay(true);
+    expect(portrait.camera).not.toBe(landscape.camera);
+    expect(portrait.sine).toBe(landscape.sine);
+    expect(portrait.worm).toBe(landscape.worm);
   });
 
   it('plays a couple of minutes with every kind of enemy and no broken numbers', () => {

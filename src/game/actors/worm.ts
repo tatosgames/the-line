@@ -34,7 +34,6 @@ export class Worm {
   private time = Math.random() * 10;
   private g = 0;
   private lunge = 0;
-  private jitter = 0;
   private flash = 0;
   /** Pressed up by an opposite wave closing in (1: full depth). */
   squash = 1;
@@ -117,11 +116,11 @@ export class Worm {
 
   /** Body-local (u from the head, v down from the line) to world, riding the line. */
   private tf(line: SpringLine) {
-    const jit = this.jitter, x0 = this.x, sc = this.sc;
+    const x0 = this.x, sc = this.sc;
     return (u: number, v: number): [number, number] => {
       u *= sc; v *= sc;
       // The lunge stretches the head forward and leaves the tail in place.
-      const uu = u - this.lunge * (1 - u / (WORM_W * sc)) + (jit ? (Math.random() - 0.5) * jit * 2 : 0);
+      const uu = u - this.lunge * (1 - u / (WORM_W * sc));
       return [x0 + uu, line.sample(x0 + clamp(uu, -10, WORM_W * sc)) + v * this.squash];
     };
   }

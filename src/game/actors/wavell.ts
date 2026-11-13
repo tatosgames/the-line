@@ -12,7 +12,7 @@
 import { RenderPath } from '../../core/renderPath';
 import type { Controls } from '../../core/input';
 import type { SpringLine } from '../line';
-import { COLORS, Neon, clamp, lerp, polyPath, smooth } from '../../core/neon';
+import { COLORS, Neon, clamp, lerp, polyPath, smooth, visualRand, visualRandom } from '../../core/neon';
 import { DIFF } from '../../data/difficulty';
 import { TUNE } from '../../data/tune';
 import { ANIM, I, TILT, clipLength, mark, mix, namedPose, pose, type Joint, type Pose } from '../../data/anim';
@@ -96,7 +96,6 @@ export class Wavell {
   /** Pieces broken off since the game last looked: flat x0, y0, x1, y1 quads in world space. */
   readonly crumbs: number[] = [];
   /** The burning point, while he crumbles. */
-  ember: [number, number] | null = null;
   /** Seconds of dizziness left. */
   dizzy = 0;
   /** How many times he has grown. An enemy's hit takes one of these instead of a life. */
@@ -229,7 +228,6 @@ export class Wavell {
     this.kick = 0;
     this.burnt = 0;
     this.crumbs.length = 0;
-    this.ember = null;
     this.vel = 0;
     this.go('dead');
   }
@@ -512,7 +510,7 @@ export class Wavell {
   private get lookUp() { return this.sinking ? smooth(this.t / this.linger / 0.3) * LOOK_UP : 0; }
 
   /** Pose space to world: squashes for flipping, and follows the line. */
-  private transform(line: SpringLine) {
+  private transform(line: SpringLine, random = Math.random) {
     const ground = line.sample(this.x);
     // Flipping turns him inside out through the line; under it he stays mirrored.
     let sy = Math.cos(this.flip * Math.PI), sx = 1 + 0.45 * Math.sin(this.flip * Math.PI), jit = 0;
@@ -523,10 +521,10 @@ export class Wavell {
     return (px: number, py: number): [number, number] => {
       px *= scale;
       py *= scale;
-      const wx = x0 + f * px * sx + sway * py + (jit ? (Math.random() - 0.5) * jit : 0);
+      const wx = x0 + f * px * sx + sway * py + (jit ? (random() - 0.5) * jit : 0);
       // Low points ride the line under them; higher ones move with the body.
       const h = py * sy, w = clamp(Math.abs(h) / 8, 0, 1);
-      return [wx, lerp(line.sample(wx), ground, w) - h + (jit ? (Math.random() - 0.5) * jit : 0)];
+      return [wx, lerp(line.sample(wx), ground, w) - h + (jit ? (random() - 0.5) * jit : 0)];
     };
   }
 
@@ -603,25 +601,24 @@ export class Wavell {
    * his front hand and the line carries on from there. During a pull it ends in the
    * bulge, which stays within `room` of him.
    */
-  stroke(line: SpringLine, room = Infinity): number[] | null {
+  stroke(line: SpringLine, room = Infinity, random = Math.random): number[] | null {
     if (this.state === 'fly' && !this.puffing) return null;
     if (this.state === 'dead' && this.death === 'fall') {
       // Only what the break hasn't reached yet, starting at the burning point.
-      if (this.burnt >= 1) { this.ember = null; return null; }
-      const pts = this.fullStroke(line), lens = arcLengths(pts);
+      if (this.burnt >= 1) return null;
+      const pts = this.fullStroke(line, room, random), lens = arcLengths(pts);
       const d = this.burnt * lens[lens.length - 1];
       let i = 0;
       while (i < lens.length - 1 && lens[i + 1] <= d) i++;
-      this.ember = pointAt(pts, lens, d);
-      return [...this.ember, ...pts.slice((i + 1) * 2)];
+      return [...pointAt(pts, lens, d), ...pts.slice((i + 1) * 2)];
     }
     if (this.state === 'dead' && (this.death === 'pop' || this.t >= this.linger)) return null;
-    return this.fullStroke(line, room);
+    return this.fullStroke(line, room, random);
   }
 
   /** The whole figure as a stroke in world space, left to right. */
-  private fullStroke(line: SpringLine, room = Infinity): number[] {
-    const tf = this.transform(line);
+  private fullStroke(line: SpringLine, room = Infinity, random = Math.random): number[] {
+    const tf = this.transform(line, random);
     const p = this.state === 'appear' || this.sinking || (this.state === 'dead' && this.diedClimbing) ? aboveLine(this.strokePose()) : this.strokePose();
     const out: number[] = [];
     for (let i = 0; i < p.length; i += 2) out.push(...tf(p[i], p[i + 1]));
@@ -660,7 +657,7 @@ export class Wavell {
 
   /** The first part of the stroke ahead of the break, for the hot glow. */
   private hotStretch(line: SpringLine, len: number): number[] | null {
-    const s = this.stroke(line);
+    const s = this.stroke(line, Infinity, visualRandom);
     if (!s) return null;
     const out = [s[0], s[1]];
     let d = 0;
@@ -672,8 +669,8 @@ export class Wavell {
   }
 
   /** His shape as he stands, or the bubble's ring: what the aura of growing plays over. */
-  auraPoints(line: SpringLine): number[] {
-    if (!this.flying || this.puffing) return this.stroke(line) ?? [];
+  auraPoints(line: SpringLine, random = Math.random): number[] {
+    if (!this.flying || this.puffing) return this.stroke(line, Infinity, random) ?? [];
     const out: number[] = [];
     for (let i = 0; i <= 48; i++) {
       const a = -Math.PI / 2 + (i / 48) * Math.PI * 2;
@@ -687,7 +684,7 @@ export class Wavell {
    * cyan to violet as they go, while light runs along him from both feet to meet at the head.
    */
   private drawAura(neon: Neon, line: SpringLine) {
-    const pts = this.auraPoints(line);
+    const pts = this.auraPoints(line, visualRandom);
     if (pts.length < 4) return;
     const t = 1 - this.glowing / DIFF.growGlow, fade = Math.min(1, this.glowing / 0.25);
     let x0 = Infinity, x1 = -Infinity, y0 = Infinity, y1 = -Infinity;
@@ -726,13 +723,13 @@ export class Wavell {
     if (this.glowing > 0 && this.alive) this.drawAura(neon, line);
     // Just lost a size: he flashes for as long as nothing can hurt him.
     if (this.safe > 0 && this.alive && Math.floor(this.time * 14) % 2 === 0) {
-      const s = this.stroke(line);
+      const s = this.stroke(line, Infinity, visualRandom);
       if (s) neon.glow(polyPath(s), COLORS.danger, 0.9, 1);
     }
     if (this.puffing) { this.drawPuffEyes(neon, line, this.t / TUNE.takeoff); return; }
     if (this.state === 'land') {
       // The same, backwards, with the bubble's colour draining out of him.
-      const left = 1 - this.landed / 0.35, s = this.stroke(line);
+      const left = 1 - this.landed / 0.35, s = this.stroke(line, Infinity, visualRandom);
       if (left > 0 && s) neon.glow(polyPath(s), this.landColor, 0.85, left);
       this.drawPuffEyes(neon, line, 1 - this.landed);
       return;
@@ -742,7 +739,7 @@ export class Wavell {
     else if (this.state === 'dead' && !this.sinking) return;
     // Under the line: his eyes haven't come up yet, or have gone.
     if ((this.state === 'appear' && this.cur[I.head + 1] < 1.5) || (this.sinking && this.eyesGone)) return;
-    const tf = this.transform(line), H = this.headTf();
+    const tf = this.transform(line, visualRandom), H = this.headTf();
     const E = (lx: number, ly: number) => tf(...H(lx, ly));
     const eyes = new RenderPath();
     // A slow blink now and then.
@@ -778,17 +775,17 @@ export class Wavell {
   /** The break as it runs along him: a white-hot point and the stroke glowing ahead of it. */
   private drawBurn(neon: Neon, line: SpringLine) {
     const hot = this.hotStretch(line, 10);
-    if (!hot || !this.ember) return;
-    const flick = 0.7 + Math.random() * 0.5;
+    if (!hot) return;
+    const flick = visualRand(0.7, 1.2);
     neon.glow(polyPath(hot), COLORS.danger, 1.3, flick);
-    const [ex, ey] = this.ember, core = new RenderPath();
-    core.arc(ex, ey, 0.9 + Math.random() * 0.5, 0, Math.PI * 2);
+    const [ex, ey] = hot, core = new RenderPath();
+    core.arc(ex, ey, visualRand(0.9, 1.4), 0, Math.PI * 2);
     neon.glow(core, '#ffffff', 1.2, 1.4);
   }
 
   /** Filling up (k, 0..1): his eyes spread apart and go wide, then screw shut as he gets tight, then settle into the bubble's. */
   private drawPuffEyes(neon: Neon, line: SpringLine, k: number) {
-    const tf = this.transform(line), H = this.headTf(), sc = this.scale;
+    const tf = this.transform(line, visualRandom), H = this.headTf(), sc = this.scale;
     const spread = smooth(k / 0.5), eyes = new RenderPath();
     EYES.forEach((e, i) => {
       const end = BUBBLE_EYE_X * (i ? 1 : -1) / sc, ex = lerp(e, end, spread), ey = lerp(PUPIL_Y, BUBBLE_EYE_Y / sc, spread);

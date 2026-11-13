@@ -3,7 +3,7 @@
 // so it wiggles slowly.
 
 import { RenderPath } from '../core/renderPath';
-import { Neon, clamp, lerp, polyPath, rand, smooth } from '../core/neon';
+import { Neon, clamp, lerp, polyPath, smooth, visualRand, visualRandom } from '../core/neon';
 import { Fx } from './fx';
 
 /** On screen: the most it can fill of the width, its size per world unit, and the title's baseline above the line. */
@@ -286,10 +286,10 @@ export class TitleDust {
     this.pts = resample(wordPoints(n, TITLE_WORD, time), DUST_POINTS);
     const reached = Math.round(this.progress * DUST_POINTS);
     for (; this.shed < reached; this.shed++) {
-      const a = rand(0, Math.PI * 2), v = rand(...DUST_SPEED);
+      const a = visualRand(0, Math.PI * 2), v = visualRand(...DUST_SPEED);
       // In world units from the corner of the play area, so that the sparks are the size of the game's.
       this.fx.spark(this.pts[this.shed * 2] / n.unit, this.pts[this.shed * 2 + 1] / n.unit, Math.cos(a) * v, Math.sin(a) * v,
-        rand(...DUST_LIFE), Math.random() < 0.2 ? '#fff1b0' : css(TITLE_TINT.stroke), 0, 0);
+        visualRand(...DUST_LIFE), visualRandom() < 0.2 ? '#fff1b0' : css(TITLE_TINT.stroke), 0, 0);
     }
     this.fx.update(dt);
   }
@@ -300,7 +300,7 @@ export class TitleDust {
       drawHaze(n, TITLE_WORD, TITLE_TINT, 1 - this.progress);
       drawStroke(n, polyPath(rest), TITLE_TINT, width);
       // The stroke runs hot just ahead of the break, and the break itself is white-hot.
-      n.glow(polyPath(rest.slice(0, 16)), '#fff1b0', width * 1.3, 0.7 + rand(0, 0.5));
+      n.glow(polyPath(rest.slice(0, 16)), '#fff1b0', width * 1.3, visualRand(0.7, 1.2));
       const core = new RenderPath();
       core.arc(rest[0], rest[1], width * 0.9, 0, Math.PI * 2);
       n.glow(core, '#ffffff', width, 1.4);

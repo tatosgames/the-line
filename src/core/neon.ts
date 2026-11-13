@@ -6,6 +6,7 @@
 // where a phone's thumbs go. World y = 0 is the line's rest height; negative y is up.
 
 import { GLYPH_H, pixelText, pixelTextWidth } from './pixelfont';
+import { seededRandom } from './random';
 import { RenderPath } from './renderPath';
 
 export const COLORS = {
@@ -24,6 +25,10 @@ export const clamp = (v: number, a: number, b: number) => (v < a ? a : v > b ? b
 export const lerp = (a: number, b: number, t: number) => a + (b - a) * t;
 export const smooth = (t: number) => { t = clamp(t, 0, 1); return t * t * (3 - 2 * t); };
 export const rand = (a: number, b: number) => a + Math.random() * (b - a);
+
+// Visual effects may run at any refresh rate, independently of the simulation's RNG.
+export const visualRandom = seededRandom(0x42df71b);
+export const visualRand = (a: number, b: number) => a + visualRandom() * (b - a);
 
 /** Straight segments through flat [x0, y0, x1, y1, ...] points. */
 export function polyPath(p: Pts, closed = false, path = new RenderPath()): RenderPath {
@@ -139,8 +144,8 @@ export class Neon {
     if ((this.canvas.clientWidth || window.innerWidth) !== this.fullW || (this.canvas.clientHeight || window.innerHeight) !== this.fullH) this.resize();
     this.shake = Math.max(0, this.shake - dt * 12);
     const s = this.shake * this.unit;
-    this.sx = (Math.random() - 0.5) * s;
-    this.sy = (Math.random() - 0.5) * s;
+    this.sx = s ? visualRand(-0.5, 0.5) * s : 0;
+    this.sy = s ? visualRand(-0.5, 0.5) * s : 0;
   }
 
   begin(dt: number, clip = true) {

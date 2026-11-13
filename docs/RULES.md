@@ -45,7 +45,7 @@ The player can change keys and joypad buttons under CONTROL in the menu. These a
 | Back to the start screen | Esc | Back | |
 
 - **Directions are relative to the line.** "Towards" goes through it and "away" floats off, on whichever side Wavell is.
-- **Menu.** ↑ and ↓ cycle the entries (START, CONTROL, CREDITS). Enter, a wipe, a pull or joypad A picks the front one: Wavell pulls it in to open it. On a phone, swipe up or down and tap.
+- **Menu.** ↑ and ↓ cycle the entries (START, CONTROL, CREDITS). Enter, a wipe, a pull or joypad A picks the front one: Wavell pulls it in to open it. On a phone, swipe up or down and tap. The navigation hint disappears after the first menu action and returns when the page is reloaded.
 - **First-time hints.** Each enemy and each mistake (such as a wrong attack) shows a hint the first time, for 3.5 s, worded for keys or touch depending on the input in use.
 - **Saved.** Key bindings are saved in the browser.
 
@@ -319,8 +319,11 @@ Everything is drawn as glowing vector strokes at the screen's native resolution.
 
 The game runs in the browser at <https://matamadio.github.io/the-line/> and installs as an app (PWA), which also lets it play offline.
 
+The offline download includes the game's sound effects, including the WAV fallbacks for its optimized audio.
+
 - **Saved in the browser:** best score, key bindings, audio choices (mute, style, time signature) and Nostalgia mode. Nothing is saved online.
 - **Phones:** in portrait, the HUD sits at the top and the play area is centred. Start movement and attack gestures below it. In landscape, the thumb controls are near the lower corners. Use Settings → Fullscreen where supported. Install from the start screen's install button or from the Share menu on iPhone.
+- The portrait crop keeps the Sinepede and Worm entrance distances based on the full 16:9 play area.
 - **Shared origin:** several apps live on matamadio.github.io, so the manifest needs its own explicit id (`/the-line/`).
 - **Sound** only starts after the first tap or key press, as browsers require.
 

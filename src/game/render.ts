@@ -2,7 +2,7 @@
 // everything flying around it. Only reads the game's state; the HUD is in hud.ts.
 
 import { RenderPath } from '../core/renderPath';
-import { COLORS, rand, smoothPath } from '../core/neon';
+import { COLORS, smoothPath, visualRand, visualRandom } from '../core/neon';
 import { DIFF } from '../data/difficulty';
 import { BUBBLE_GREEN } from './actors/bubble';
 import type { Sinepede, Skirts } from './actors/sinepede';
@@ -66,7 +66,8 @@ function drawBackdrop(g: Game) {
     n.fillRect(x, s.y * n.fullH, s.s, s.s, '#fff4c0', (0.25 + 0.25 * Math.sin(g.time * 2 + s.p)) * s.z * 3, true);
   }
   // Two faint lines far away, scrolling slower: depth without clutter. The menu has lines of its own.
-  n.fade = g.quiet || g.menu.backdropShows ? 1 : 0;
+  n.fade = 1;
+  if (!g.quiet && !g.menu.backdropShows) return;
   for (const [i, line] of BACK_LINES.entries()) {
     const p = new RenderPath();
     const baseline = n.fullH > n.fullW
@@ -78,7 +79,6 @@ function drawBackdrop(g: Game) {
     }
     n.glow(p, COLORS.line, n.unit * 0.5, line.alpha);
   }
-  n.fade = 1;
 }
 
 /**
@@ -123,7 +123,7 @@ function drawLine(g: Game): Map<Sinepede, Skirts> {
   };
   for (const k of knots) ahead(k.x0, k.x1);
   for (const s of g.sinepedes) ahead(s.x, s.back);
-  const w = g.wavell.stroke(L, room);
+  const w = g.wavell.stroke(L, room, visualRandom);
   // While he crumbles, what is left of him no longer joins the line.
   if (w) knots.push({ pts: w, x0: Math.min(w[0], w[w.length - 2]), x1: Math.max(w[0], w[w.length - 2]), flash: 0, solo: g.wavell.burning });
   // A Sinepede's shoulders share out the room on each side of it, so they never run into what is next to them.
@@ -178,10 +178,10 @@ function drawLine(g: Game): Map<Sinepede, Skirts> {
   if (g.endX > n.camX - 20 && !(W.state === 'dead' && W.death === 'fall') && !g.crumbles.length) {
     const fray = new RenderPath();
     for (let j = 0; j < 9; j++) {
-      if (Math.random() < 0.15 + j * 0.06) continue;
-      const x0 = g.endX + j * 1.8 - 9 + Math.random() * 0.6;
-      fray.moveTo(x0, L.sample(x0) + rand(-0.6, 0.6));
-      fray.lineTo(x0 + 0.9, L.sample(x0) + rand(-0.6, 0.6));
+      if (visualRandom() < 0.15 + j * 0.06) continue;
+      const x0 = g.endX + j * 1.8 - 9 + visualRandom() * 0.6;
+      fray.moveTo(x0, L.sample(x0) + visualRand(-0.6, 0.6));
+      fray.lineTo(x0 + 0.9, L.sample(x0) + visualRand(-0.6, 0.6));
     }
     n.glow(fray, COLORS.line, 0.8, 0.9);
   }

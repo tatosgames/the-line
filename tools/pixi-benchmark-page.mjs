@@ -44,8 +44,7 @@ function seeded(seed) {
   };
 }
 
-// Keep the replay independent from renderer-specific visual randomness. Silence
-// the audio device and network so unlocking Web Audio cannot skew render samples.
+// Silence the audio device and network so unlocking Web Audio cannot skew render samples.
 sfx.unlock = () => {};
 
 let game;
@@ -104,10 +103,16 @@ function advance(target) {
 }
 
 function draw() {
-  Math.random = renderRandom;
+  // The pinned build predates the separate visual RNG. Exercise the current build
+  // with its simulation seed installed so drawing can never hide stray RNG calls.
+  Math.random = __PINNED_CANVAS__ ? renderRandom : simulationRandom;
+  const random = Math.random;
+  let calls = 0;
+  Math.random = () => { calls++; return random(); };
   try {
     if (pixi) pixi.draw(game, 1 / 60);
     else drawGame(game, 1 / 60);
+    if (!__PINNED_CANVAS__ && calls) throw new Error('Drawing consumed simulation RNG');
   } finally {
     Math.random = nativeRandom;
   }

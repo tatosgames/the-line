@@ -1,11 +1,12 @@
 import { execFile } from 'node:child_process';
-import { mkdir, readdir, stat, unlink, writeFile } from 'node:fs/promises';
+import { mkdir, readdir, rm, stat, unlink, writeFile } from 'node:fs/promises';
 import { dirname, extname, join, resolve } from 'node:path';
 import { promisify } from 'node:util';
 import type { Plugin } from 'vite';
 import { SAMPLES, type Sample, type SampleManifest } from '../src/core/samples';
 
 const run = promisify(execFile);
+const wavFiles = new Set(Object.values(SAMPLES).map((name) => `${name}.wav`));
 const formats = [
   { extension: 'mp3', codec: 'libmp3lame', quality: ['-b:a', '32k'] },
   { extension: 'ogg', codec: 'libvorbis', quality: ['-q:a', '2'] },
@@ -26,7 +27,6 @@ export function packSounds(): Plugin {
       const { AssetPack, createNewAssetAt } = await import('@assetpack/core');
       const entry = resolve(config.root, 'public/assets/sounds');
       const output = resolve(config.root, 'public/assets/sounds-packed');
-      const sourceFiles = new Set<string>(Object.values(SAMPLES).map((name) => `${name}.wav`));
       const manifestPath = join(output, 'manifest.json');
       const completeOutput = await Promise.all([
         stat(manifestPath),
@@ -35,7 +35,7 @@ export function packSounds(): Plugin {
       const pack = new AssetPack({
         entry,
         output,
-        ignore: (await readdir(entry)).filter((file) => !sourceFiles.has(file)),
+        ignore: (await readdir(entry)).filter((file) => !wavFiles.has(file)),
         cache: completeOutput,
         cacheLocation: resolve(config.root, '.assetpack'),
         logLevel: 'warn',
@@ -79,6 +79,14 @@ export function packSounds(): Plugin {
           .sort((a, b) => a.size - b.size).map(({ file }) => file);
       }
       await writeFile(manifestPath, JSON.stringify(manifest, null, 2) + '\n');
+    },
+    async writeBundle({ dir }) {
+      if (!dir) return;
+      const sounds = join(dir, 'assets/sounds');
+      const files = await readdir(sounds, { withFileTypes: true });
+      // Vite copies public/ verbatim. Keep only the WAV fallbacks before PWA precaching.
+      await Promise.all(files.filter((file) => file.isFile() && extname(file.name) === '.wav' && !wavFiles.has(file.name))
+        .map((file) => rm(join(sounds, file.name), { force: true })));
     },
   };
 }

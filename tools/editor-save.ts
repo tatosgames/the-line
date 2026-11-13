@@ -55,6 +55,8 @@ export const editorSave = (): Plugin => ({
   name: 'editor-save',
   apply: 'serve',
   configureServer(server) {
+    const host = server.config.server.host;
+    if (host && host !== 'localhost' && host !== '127.0.0.1' && host !== '::1') return;
     server.middlewares.use('/__anim', saveTo('anim.json', formatAnim));
     server.middlewares.use('/__boss', saveTo('boss.json', formatBoss));
     server.middlewares.use('/__difficulty', saveTo('difficulty.json', formatDifficulty));

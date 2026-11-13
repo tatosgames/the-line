@@ -109,6 +109,7 @@ export class Menu {
   private mouseX = -1;
   private mouseY = -1;
   private confirmAsked = false;
+  private usedMainControls = false;
   /** Just back from a game: the far lines are the game's background, on their way to being the menu's. */
   private fromGame = false;
   /** How much of the menu showed as the last game started. */
@@ -321,6 +322,7 @@ export class Menu {
   }
 
   private handleMain(inp: Input) {
+    if (inp.menuUp || inp.menuDown || inp.swipeV || inp.confirm || inp.tap) this.usedMainControls = true;
     if (inp.menuUp) this.go(1);
     if (inp.menuDown) this.go(-1);
     // A swipe moves the lines the way the finger goes: down brings the ones behind closer.
@@ -515,8 +517,9 @@ export class Menu {
   drawHud() {
     const n = this.g.neon, s = hudSize(n), inp = this.g.input, touch = usesTouch(inp);
     if (this.page === 'main') {
+      if (this.usedMainControls) return;
       n.fade = this.stack;
-      n.text(touch ? 'swipe to choose   tap to select' : '↑ ↓ choose   Enter select', n.w / 2, n.lineY + s * 2.4, s * 0.7, COLORS.hud, 'center', 0.55 + 0.45 * Math.sin(this.g.time * 4));
+      n.text(touch ? 'Swipe up or down · Tap to open' : '↑ ↓ choose   Enter select', n.w / 2, n.lineY + s * 2.4, s * 0.7, COLORS.hud, 'center', 0.75);
       n.fade = 1;
     } else if (this.page === 'credits') {
       this.drawCredits();

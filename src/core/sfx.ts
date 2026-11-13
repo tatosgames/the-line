@@ -6,6 +6,7 @@
 
 import { audioPrefs, saveAudioPrefs } from './audioPrefs';
 import { LAYERS, Music, type Meter } from './music';
+import { seededRandom } from './random';
 import { loadSample, sampleManifest, SAMPLES, type Sample } from './samples';
 import { STYLES, styleById, type Style } from './styles';
 
@@ -36,9 +37,10 @@ const SATURATION = (() => {
 /** A small room for the reverb: stereo noise dying away. */
 function roomImpulse(ctx: BaseAudioContext, seconds: number) {
   const len = Math.round(ctx.sampleRate * seconds), buf = ctx.createBuffer(2, len, ctx.sampleRate);
+  const noise = seededRandom(0x2978ca4);
   for (let ch = 0; ch < 2; ch++) {
     const d = buf.getChannelData(ch);
-    for (let i = 0; i < len; i++) d[i] = (Math.random() * 2 - 1) * (1 - i / len) ** 3;
+    for (let i = 0; i < len; i++) d[i] = (noise() * 2 - 1) * (1 - i / len) ** 3;
   }
   return buf;
 }

@@ -58,7 +58,7 @@ async function buildPage(checkout, backend) {
     base: './',
     publicDir: false,
     logLevel: 'warn',
-    define: { __BUILD_DATE__: JSON.stringify('benchmark'), __VERSION__: JSON.stringify('0.1.0') },
+    define: { __BUILD_DATE__: JSON.stringify('benchmark'), __VERSION__: JSON.stringify('0.1.0'), __PINNED_CANVAS__: JSON.stringify(checkout === baseline) },
     resolve: { alias: { '@bench': join(checkout, 'src') } },
     plugins: [{
       name: 'the-line-benchmark-entry',
@@ -75,8 +75,9 @@ async function buildPage(checkout, backend) {
 }
 
 const backends = options['entry-only'] ? [] : options['baseline-only'] ? ['canvas'] : ['canvas', 'pixi'];
+const replayBackends = backends.includes('pixi') ? [...backends, 'current-canvas'] : backends;
 try {
-  for (const backend of backends) await buildPage(backend === 'canvas' ? baseline : root, backend);
+  for (const backend of replayBackends) await buildPage(backend === 'canvas' ? baseline : root, backend);
 } catch (error) {
   await rm(temp, { recursive: true, force: true });
   throw error;
@@ -89,7 +90,7 @@ const server = createServer(async (req, res) => {
   const [, backend, ...rest] = path.split('/');
   const dir = backend === 'game' && gameDist ? gameDist : join(temp, backend, 'dist');
   const file = resolve(dir, ...(rest.some(Boolean) ? rest : ['index.html']));
-  if ((!backends.includes(backend) && !(backend === 'game' && gameDist)) || !file.startsWith(dir + sep)) {
+  if ((!replayBackends.includes(backend) && !(backend === 'game' && gameDist)) || !file.startsWith(dir + sep)) {
     res.writeHead(404).end();
     return;
   }
@@ -274,11 +275,12 @@ try {
   let current;
   async function open(backend) {
     if (current === backend) return;
-    const url = 'http://127.0.0.1:' + port + '/' + backend + '/?renderer=' + backend
+    const renderer = backend === 'current-canvas' ? 'canvas' : backend;
+    const url = 'http://127.0.0.1:' + port + '/' + backend + '/?renderer=' + renderer
       + (options['gl-diagnostics'] ? '&gl-diagnostics' : '');
     await cdp.send('Page.navigate', { url });
     try {
-      await until(() => cdp.eval('location.href === ' + JSON.stringify(url) + ' && window.benchmark?.renderer === ' + JSON.stringify(backend)));
+      await until(() => cdp.eval('location.href === ' + JSON.stringify(url) + ' && window.benchmark?.renderer === ' + JSON.stringify(renderer)));
     } catch (error) {
       if (errors.length) throw new Error(errors.join('\n'), { cause: error });
       throw error;
@@ -303,11 +305,15 @@ try {
     const stress = Object.keys(evidence.probes).sort((a, b) => evidence.probes[b].cpuP95 - evidence.probes[a].cpuP95)[0];
     evidence.stressScene = stress;
 
-    for (const backend of backends) {
+    for (const backend of replayBackends) {
       await open(backend);
       evidence.captures[backend] = {};
       for (const [scene, step] of Object.entries(requestedScenes)) {
         const data = await cdp.eval('benchmark.capture(' + JSON.stringify(scene) + ',' + step + ')');
+        if (backend === 'current-canvas') {
+          evidence.captures[backend][scene] = data;
+          continue;
+        }
         const screenshot = await cdp.send('Page.captureScreenshot', { format: 'png', fromSurface: true });
         const name = scene + '-' + captureNames[backend] + '.png';
         await writeFile(join(out, name), Buffer.from(screenshot.data, 'base64'));
@@ -315,15 +321,22 @@ try {
       }
     }
     evidence.browserWarnings = [...warnings];
-    for (const backend of backends) {
-      for (const [scene, data] of Object.entries(evidence.captures[backend])) {
-        const reference = evidence.captures.canvas[scene].state;
-        const different = Object.keys(reference).filter((key) => JSON.stringify(reference[key]) !== JSON.stringify(data.state[key]));
-        if (different.length) throw new Error('Replay diverged in ' + backend + ': ' + scene + ' (' + different.join(', ') + ')');
-        if (JSON.stringify(data.viewport) !== JSON.stringify(evidence.captures.canvas[scene].viewport)) throw new Error('Viewport/backing size differs for ' + backend + ': ' + scene);
+    evidence.baselineReplayDifferences = {};
+    for (const [scene, data] of Object.entries(evidence.captures.pixi ?? {})) {
+      const reference = evidence.captures['current-canvas'][scene];
+      const baselineFrame = evidence.captures.canvas[scene];
+      const differences = (other) => Object.keys(other.state).filter((key) => JSON.stringify(other.state[key]) !== JSON.stringify(data.state[key]));
+      const different = differences(reference);
+      if (different.length) throw new Error('Current Canvas and Pixi replay diverged: ' + scene + ' (' + different.join(', ') + ')');
+      if ([reference, baselineFrame].some((frame) => JSON.stringify(frame.viewport) !== JSON.stringify(data.viewport))) {
+        throw new Error('Viewport/backing size differs: ' + scene);
       }
+      evidence.baselineReplayDifferences[scene] = differences(baselineFrame);
     }
-    evidence.matchedReplay = backends.length > 1;
+    evidence.matchedReplay = backends.includes('pixi');
+    if (evidence.matchedReplay) {
+      evidence.baselineReplayGate = Object.values(evidence.baselineReplayDifferences).some((fields) => fields.length) ? 'fail' : 'pass';
+    }
 
     const runs = options.quick ? 1 : 3;
     for (let i = 0; i < runs; i++) {

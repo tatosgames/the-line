@@ -21,7 +21,7 @@ Your world is a line. You are a wave on it, and the end of the line is coming.
 
 **To just play or test**, open the link above. It always runs the latest version of `main`, and needs no install. Bugs and impressions go in [the issues](https://github.com/matamadio/the-line/issues/new/choose).
 
-**To work on it**, you need [Node.js](https://nodejs.org) 20 or newer and [FFmpeg](https://ffmpeg.org/download.html) on PATH with the MP3 and Vorbis encoders. Vite runs AssetPack to generate optimized sound effects from the original WAVs.
+**To work on it**, use the latest [Node.js](https://nodejs.org) 22 release (22.20 or newer, as used by CI through `.nvmrc`) and install [FFmpeg](https://ffmpeg.org/download.html) on PATH with the MP3 and Vorbis encoders. Vite runs AssetPack to generate optimized sound effects from the original WAVs.
 
 ```bash
 git clone https://github.com/matamadio/the-line.git
@@ -32,7 +32,7 @@ npm start
 
 `npm start` opens the game in your browser. Edits to the code show up as soon as you save.
 
-**To test on a phone**, run `npm run phone` and open the `Network:` address it prints, with the phone on the same Wi-Fi. Use this on networks you trust: anyone on the network can reach the dev server while it runs.
+**To test on a phone**, run `npm run phone` and open the `Network:` address it prints, with the phone on the same trusted Wi-Fi. Start a local server with `npm run lab` or `npm run difficulty` when you need to save edits to disk.
 
 **To start at a later level**, add `?level=N` to the address, for example `?level=10` to go straight to the boss. It lasts for that page only and saves nothing.
 
@@ -234,7 +234,9 @@ docs/              Game rules reference (RULES.md), design notes and the origina
 
 Each successful CI run uploads a `the-line-web` artifact. CI runs when you push a branch or update a pull request. Open the run for the commit you want to try, download the artifact, and extract it. From the extracted folder, run `python -m http.server 8000` and open `http://localhost:8000/`. Add `?renderer=pixi` to try Pixi in a build that includes it.
 
-To publish the latest `main` build at a shared URL, select **GitHub Actions** as the source in the repository's **Settings → Pages**, then run **Deploy to GitHub Pages** from the Actions tab. Subsequent pushes to `main` publish there automatically.
+On the public fork, GitHub Pages publishes the latest `feat/pixi-port` commit after its tests pass, using the same build as the downloadable artifact.
+
+To enable publishing on a fork, select **GitHub Actions** in **Settings → Pages**. To publish manually, run **CI** from the Actions tab and select `feat/pixi-port`.
 
 `dist/` can be hosted anywhere, under any path. It needs a web server, because browsers refuse to load it from a `file://` address.
 

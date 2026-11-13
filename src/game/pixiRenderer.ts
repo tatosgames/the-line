@@ -290,7 +290,7 @@ class PixiNeon extends Neon {
     let contour = this.contours[i];
     if (!contour) {
       const layer = new Container();
-      const stroke = new PixiStroke(this.shader);
+      const stroke = new PixiStroke(this.shader, true);
       stroke.mesh.blendMode = 'max';
       layer.addChild(stroke.mesh);
       layer.filters = [this.titleComposite];

@@ -14,7 +14,7 @@ Move rendering for the playable game, title, menus, and HUD to PixiJS v8. Keep t
 
 ## Acceptance and gauntlet
 
-Pass `npm run check` and `npm run build`. Compare fixed-step state under identical seeded inputs. Capture matched title, normal, dense, boss, and Nostalgia frames. Have a separate critic inspect neutral A/B captures for stroke continuity, readability, and touch behavior. Check saved bindings, disconnect, Bloom, context loss, editor previews and saves, and offline audio. Repeat the checks for each gap the critic identifies.
+Pass `npm run check` and `npm run build`. Compare fixed-step state under identical seeded inputs on both current renderers and record any state differences against the pinned build. Capture matched title, normal, dense, boss, and Nostalgia frames. Have a separate critic inspect neutral A/B captures for stroke continuity, readability, and touch behavior. Check saved bindings, disconnect, Bloom, context loss, editor previews and saves, and offline audio. Repeat the checks for each gap the critic identifies.
 
 Compare desktop Chrome and Chrome on a physical Android phone with identical inputs, backing resolution, and settings, with Bloom off. Pick the busiest repeatable scene from baseline measurements. Warm up and alternate three 30-second runs per backend. Report median per-run p95 renderer CPU time and frame time, and save traces, device details, settings, and captures.
 
@@ -22,7 +22,7 @@ Promotion requires **at least 20% lower p95 renderer CPU time on Android** and *
 
 ## Running the comparison
 
-From the migration checkout, with Node.js 22+, Chrome, and FFmpeg installed:
+From the migration checkout, with Node.js 22.20 or a later 22.x release, Chrome, and FFmpeg installed:
 
 ```sh
 git worktree add --detach ../the-line-canvas-baseline 8789a44fe6151467490a9fe4618bca43fca6cbf3
@@ -41,6 +41,8 @@ Canvas is the default. The implementation passes all 274 tests and the productio
 The preferred packed variants for 13 sound IDs total 68,452 bytes, down from 325,500 bytes for their WAV sources (79.0%). Keeping both compressed formats and the original WAVs adds 181,957 bytes to the precache. The complete uncompressed precache, including the additional Pixi bundles, grew from 1,516,236 to 2,331,758 bytes (+53.8%).
 
 Physical Android and iOS Safari verification are pending. The headed desktop run on the development host stalled when Chrome marked the benchmark tab hidden. Headless measurements are diagnostic. Pixi stroke joins are still sharper than the Canvas reference at some acute turns.
+
+After isolating visual randomness, a short Chrome headless replay matched across the current Canvas and Pixi renderers in all five scenes. Compared with the pinned Canvas commit, spring-line samples still differ in dense play and the boss fight. The strict baseline replay gate remains open.
 
 A hardware-accelerated headless Chrome run on Intel UHD completed three 30-second pairs in the boss scene with Bloom off. On the earlier full-viewport contour build, median p95 renderer CPU time was 1.90 ms for Canvas and 3.10 ms for Pixi (+63.2%). Median p95 frame time was 33.40 ms for Canvas and 16.80 ms for Pixi (−49.7%). The final build tightens contour filter bounds. These results do not establish a CPU improvement or qualify the final build for promotion.
 

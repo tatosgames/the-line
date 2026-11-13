@@ -30,7 +30,7 @@ import { canInstall, promptInstall, toggleFullscreen } from '../core/app';
 import { loadBindings } from '../core/controls';
 import { Input, usesTouch, type Controls } from '../core/input';
 import { SpringLine } from './line';
-import { COLORS, Neon, clamp, rand, smooth } from '../core/neon';
+import { COLORS, Neon, VIEW_W, clamp, rand, smooth } from '../core/neon';
 import { audioPrefs } from '../core/audioPrefs';
 import { LAYERS, meterById } from '../core/music';
 import { sfx } from '../core/sfx';
@@ -186,6 +186,8 @@ export class Game {
   readonly morphEnd = MORPH_TIME;
   /** The view jumps into place if the first step is on the title, and eases from then on. */
   private viewSet = false;
+  private spawnCameraX: number;
+  private get spawnRight() { return this.spawnCameraX + VIEW_W; }
   /** Asked for by a key since the last frame. */
   private menuAsked = false;
   /** The music is playing on the start screen. */
@@ -217,6 +219,7 @@ export class Game {
     };
     this.wavell.rise(0);
     this.neon.camX = -this.neon.viewW * this.neon.focus;
+    this.spawnCameraX = -VIEW_W * this.neon.focus;
   }
 
   /** Nostalgia mode: the game looks low resolution. It stays as it was left, from one visit to the next. */
@@ -456,7 +459,7 @@ export class Game {
     if (f) sfx.hum(near!.count, clamp(1 - best / n.viewW, 0, 1));
     else if (h && this.mode === 'play' && W.alive) {
       // Called but not in yet: the hum fades in over the two beats, up to how it sounds as it comes in.
-      const entry = clamp(1 - (n.camX + n.viewW + SINE_ENTRY + SEG_W / 2 - W.x) / n.viewW, 0, 1);
+      const entry = clamp(1 - (this.spawnRight + SINE_ENTRY + SEG_W / 2 - W.x) / VIEW_W, 0, 1);
       sfx.hum(h.count, entry * Math.sqrt(clamp(1 - h.steps / HERALD_STEPS, 0, 1)));
     } else sfx.hum(0, 0);
   }
@@ -473,8 +476,14 @@ export class Game {
       W.eyePop = null;
     }
     // On the title he stands to the left of the menu's word.
-    const target = W.x - n.viewW * (this.mode === 'title' ? MENU_FOCUS : n.focus);
-    n.camX = !this.viewSet && this.mode === 'title' ? target : n.camX + (target - n.camX) * Math.min(1, dt * 12);
+    const focus = this.mode === 'title' ? MENU_FOCUS : n.focus;
+    const first = !this.viewSet && this.mode === 'title';
+    const follow = Math.min(1, dt * 12);
+    const target = W.x - n.viewW * focus;
+    n.camX = first ? target : n.camX + (target - n.camX) * follow;
+    // The portrait crop changes framing; enemy entrances follow the full 16:9 view.
+    const spawnTarget = W.x - VIEW_W * focus;
+    this.spawnCameraX = first ? spawnTarget : this.spawnCameraX + (spawnTarget - this.spawnCameraX) * follow;
     this.viewSet = true;
     const pad = this.mode === 'title' ? this.menu.linePad : 0;
     L.cover(n.camX - 70 - pad, n.camX + n.viewW + 70 + pad);
@@ -941,7 +950,7 @@ export class Game {
   }
 
   private spawnSinepedes(dt: number) {
-    const W = this.wavell, n = this.neon;
+    const W = this.wavell;
     if (!W.alive || W.state === 'appear') return;
     if (this.bossTime) { this.herald = null; return; }
     // Called two beats ago, it comes in now, as its hum has been saying. With the beat on,
@@ -950,7 +959,7 @@ export class Game {
     if (h) h.steps--;
     if (h && (h.due || (h.beats === null && h.steps <= 0))) {
       this.herald = null;
-      const s = new Sinepede(n.camX + n.viewW + SINE_ENTRY, h.speed, h.count, h.side);
+      const s = new Sinepede(this.spawnRight + SINE_ENTRY, h.speed, h.count, h.side);
       this.sinepedes.push(s);
       sfx.call(s.sides);
       this.teach('sinepede', 'SINEPEDE: a crest on your side: SWIPE ↔. A trough on the other: SWIPE ↕', 'SINEPEDE: a crest on your side: {pull}. A trough on the other: {drag}');
@@ -1001,7 +1010,7 @@ export class Game {
   }
 
   private spawnWorms(dt: number) {
-    const W = this.wavell, n = this.neon;
+    const W = this.wavell;
     if (!W.alive || W.state === 'appear' || this.playTime < DIFF.wormFrom) return;
     // Worms come faster for players who hide under the line.
     if (this.quiet || !this.canSpawn()) return;
@@ -1010,7 +1019,7 @@ export class Game {
     if (this.wormClock >= every && this.takes('worm')) {
       this.cue = false;
       this.wormClock = rand(-1, 0);
-      this.worms.push(new Worm(n.camX + n.viewW + 20, at('wormSpeed', this.ramp)));
+      this.worms.push(new Worm(this.spawnRight + 20, at('wormSpeed', this.ramp)));
       this.teach('worm', 'WORM: SWIPE ↔ to pull it flat', 'WORM: {pull} pulls it flat');
     }
   }
@@ -1412,10 +1421,12 @@ export class Game {
         if (Math.random() < 0.12) fx.disperse(c[i], c[i + 1], COLORS.danger);
       }
       c.length = 0;
-      if (W.ember && Math.random() < 0.3) fx.disperse(W.ember[0], W.ember[1], '#fff1b0');
       // The line starts where what is left of him ends, so it has one end: the ember.
       const left = W.stroke(L);
-      if (left) this.endX = Math.max(this.endX, left[left.length - 2] - 7);
+      if (left) {
+        if (Math.random() < 0.3) fx.disperse(left[0], left[1], '#fff1b0');
+        this.endX = Math.max(this.endX, left[left.length - 2] - 7);
+      }
     }
     // Burnt through, the line twangs.
     if (W.death === 'fall' && W.t >= W.linger && W.t - STEP < W.linger) L.impulse(W.x + 8, 120, 8);

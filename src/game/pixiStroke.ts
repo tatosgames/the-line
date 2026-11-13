@@ -76,7 +76,7 @@ export class PixiStroke {
   private right = -Infinity;
   private bottom = -Infinity;
 
-  constructor(shader: Shader) {
+  constructor(shader: Shader, private readonly trackBounds = false) {
     this.mesh = new Mesh({ geometry: this.geometry, shader });
     this.mesh.blendMode = 'add';
   }
@@ -90,7 +90,7 @@ export class PixiStroke {
   append(path: RenderPath, sx: number, sy: number, tx: number, ty: number, width: number,
     rgb: number[], fade: number, intensity: number, blur: number) {
     const points = this.points;
-    const reach = (width * Math.max(8, 1 + blur) / 2 + 1) * 1.35 + 2;
+    const reach = this.trackBounds ? (width * Math.max(8, 1 + blur) / 2 + 1) * 1.35 + 2 : 0;
     let x = 0, y = 0;
     const flush = () => {
       if (points.length >= 4) this.strip(points, width, rgb, fade, intensity, blur);
@@ -99,10 +99,12 @@ export class PixiStroke {
     const point = (px: number, py: number) => {
       x = px; y = py;
       const xx = px * sx + tx, yy = py * sy + ty;
-      this.left = Math.min(this.left, xx - reach);
-      this.top = Math.min(this.top, yy - reach);
-      this.right = Math.max(this.right, xx + reach);
-      this.bottom = Math.max(this.bottom, yy + reach);
+      if (reach) {
+        this.left = Math.min(this.left, xx - reach);
+        this.top = Math.min(this.top, yy - reach);
+        this.right = Math.max(this.right, xx + reach);
+        this.bottom = Math.max(this.bottom, yy + reach);
+      }
       if (xx !== points[points.length - 2] || yy !== points[points.length - 1]) points.push(xx, yy);
     };
     for (const cmd of path.commands) {
@@ -166,14 +168,23 @@ export class PixiStroke {
       next.set(this.indices); this.indices = next; this.indexBuffer.data = next;
     }
     const closed = points[0] === points[points.length - 2] && points[1] === points[points.length - 1];
+    let incomingX = 0, incomingY = 0;
+    if (closed) {
+      const dx = points[0] - points[points.length - 4], dy = points[1] - points[points.length - 3];
+      const length = Math.hypot(dx, dy);
+      if (length) { incomingX = dx / length; incomingY = dy / length; }
+    }
     for (let i = 0; i < n; i++) {
       const p = i * 2, x = points[p], y = points[p + 1];
-      const a = i > 0 ? p - 2 : closed ? points.length - 4 : p;
       const b = i + 1 < n ? p + 2 : closed ? 2 : p;
-      const ax = x - points[a], ay = y - points[a + 1], bx = points[b] - x, by = points[b + 1] - y;
-      const al = Math.hypot(ax, ay), bl = Math.hypot(bx, by);
-      const ux = al ? ax / al : bx / bl, uy = al ? ay / al : by / bl;
-      const vx = bl ? bx / bl : ux, vy = bl ? by / bl : uy;
+      const dx = points[b] - x, dy = points[b + 1] - y;
+      const length = b === p ? 0 : Math.hypot(dx, dy);
+      const outgoingX = length ? dx / length : 0, outgoingY = length ? dy / length : 0;
+      const hasIncoming = incomingX !== 0 || incomingY !== 0;
+      const ux = hasIncoming ? incomingX : outgoingX, uy = hasIncoming ? incomingY : outgoingY;
+      const vx = length ? outgoingX : ux, vy = length ? outgoingY : uy;
+      incomingX = outgoingX;
+      incomingY = outgoingY;
       const bisector = Math.hypot(ux + vx, uy + vy);
       // Cap the miter on tight corners so the halo stays close to the contour.
       const scale = bisector > 0.1 ? Math.min(1.35, 2 / bisector) / bisector : 0;

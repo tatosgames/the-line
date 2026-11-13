@@ -27,6 +27,7 @@ The [project layout](README.md#project-layout) shows where things live. A few ru
 **The simulation has to stay exact.** The animation lab scrubs backwards by replaying from the start, so the same seed and keys must always give the same game. In simulation code:
 
 - Use `Math.random()`, or `rand()` from `core/neon.ts`. The lab swaps in a seeded generator around each step.
+- Use `visualRandom()` or `visualRand()` for effects that run at the screen's refresh rate.
 - Don't read the clock (`Date.now`, `performance.now`).
 - Don't let drawing change the game's state. `render.ts` and `hud.ts` run at the screen's rate, and in the lab they don't run during a replay.
 
