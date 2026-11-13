@@ -59,11 +59,11 @@ In the menu, ↑ goes to the line behind and ↓ to the one before, round and ro
 
 The one rule to remember: **pull in what is close on your side, wipe what is on the other.** The wrong attack feeds a creature and it grows. Each enemy is explained the first time it appears. [docs/RULES.md](docs/RULES.md) lists every rule with its numbers: controls, enemies, scoring, levels, music and the beat. [docs/DESIGN.md](docs/DESIGN.md) explains the design behind them.
 
-Every screen shows the same 16:9 play area, 356x200 world units, so nobody sees further ahead than anyone else.
+In landscape, the 16:9 play area shows roughly 356 × 200 world units. In portrait, the view is cropped slightly at the sides to make the action easier to see.
 
 ### On a phone
 
-In portrait, the play area sits above the two touch gesture zones. In landscape, the play area fits the available screen and the touch controls sit near the lower corners. Use Settings → Fullscreen where supported.
+In portrait, the HUD sits at the top, the play area is centred at 1.15× scale, and the touch gestures start below it. In landscape, the play area fits the available screen and the touch controls sit near the lower corners. Use Settings → Fullscreen where supported.
 
 To install the game as an app, which also lets it play offline:
 
@@ -229,6 +229,12 @@ docs/              Game rules reference (RULES.md), design notes and the origina
 | `npm run check` | Type-checks and runs the tests: what CI runs on each pull request |
 | `npm run build` | Type-checks and builds the static site into `dist/` |
 | `npm run preview` | Serves `dist/` to try out the build |
+
+### Play a build from GitHub Actions
+
+Each successful CI run uploads a `the-line-web` artifact. CI runs when you push a branch or update a pull request. Open the run for the commit you want to try, download the artifact, and extract it. From the extracted folder, run `python -m http.server 8000` and open `http://localhost:8000/`. Add `?renderer=pixi` to try Pixi in a build that includes it.
+
+To publish the latest `main` build at a shared URL, select **GitHub Actions** as the source in the repository's **Settings → Pages**, then run **Deploy to GitHub Pages** from the Actions tab. Subsequent pushes to `main` publish there automatically.
 
 `dist/` can be hosted anywhere, under any path. It needs a web server, because browsers refuse to load it from a `file://` address.
 

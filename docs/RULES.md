@@ -25,7 +25,7 @@ Wavell walks right along a line while its end crumbles in behind him. He has to 
 - **Everything is one stroke.** Wavell is a knot in the line. Creatures are stretches of the line bent into shape. Nothing is a sprite.
 - **Two sides.** Wavell can walk on top of the line or upside down underneath it. All rules work the same from either side.
 - **Time is the pressure.** Stopping, flipping or attacking all cost ground to the end of the line.
-- **Play area.** Every screen shows the same 16:9 area, 356 × 200 world units, so nobody sees further ahead.
+- **Play area.** Landscape shows a 16:9 area of about 356 × 200 world units. Portrait scales the centred play area by 1.15×, cropping the sides to about 309 × 200 world units.
 
 ## Controls
 
@@ -320,7 +320,7 @@ Everything is drawn as glowing vector strokes at the screen's native resolution.
 The game runs in the browser at <https://matamadio.github.io/the-line/> and installs as an app (PWA), which also lets it play offline.
 
 - **Saved in the browser:** best score, key bindings, audio choices (mute, style, time signature) and Nostalgia mode. Nothing is saved online.
-- **Phones:** the game fits the same 16:9 play area in either orientation. In portrait, start movement and attack gestures below the play area. In landscape, the thumb controls are near the lower corners. Use Settings → Fullscreen where supported. Install from the start screen's install button or from the Share menu on iPhone.
+- **Phones:** in portrait, the HUD sits at the top and the play area is centred. Start movement and attack gestures below it. In landscape, the thumb controls are near the lower corners. Use Settings → Fullscreen where supported. Install from the start screen's install button or from the Share menu on iPhone.
 - **Shared origin:** several apps live on matamadio.github.io, so the manifest needs its own explicit id (`/the-line/`).
 - **Sound** only starts after the first tap or key press, as browsers require.
 

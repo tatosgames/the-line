@@ -12,6 +12,10 @@ import { MORPH_TIME, drawFlatlined, drawMorph, drawTitle } from './title';
 /** The HUD's base size: a share of the play area, so it lays out the same on every screen. */
 export const hudSize = (n: Neon) => n.h * 0.045;
 
+const portraitHud = (n: Neon) => n.fullH > n.fullW;
+const statusSize = (n: Neon) => portraitHud(n) ? Math.min(24, Math.max(17, n.w * 0.047)) : hudSize(n);
+const statusTop = (n: Neon) => portraitHud(n) ? -n.oy + 6 : 0;
+
 const BUTTON_Y = 1.1, SCORE_RIGHT = 2.9;
 
 /** Nostalgia mode's pictures of the HUD, drawn pixel by pixel. */
@@ -88,12 +92,12 @@ function drawDevMenu(g: Game) {
 
 /** Top-right settings button, with a larger hit target than its icon. */
 export function settingsButton(n: Neon): [number, number, number] {
-  const s = hudSize(n), radius = Math.max(22, s * 0.9);
-  return [n.w - Math.max(radius, s * 1.4), Math.max(radius, BUTTON_Y * s), radius];
+  const s = statusSize(n), radius = Math.max(22, s * 0.9);
+  return [n.w - Math.max(radius, s * 1.4), statusTop(n) + Math.max(radius, BUTTON_Y * s), radius];
 }
 
 function drawSettings(n: Neon) {
-  const [x, y] = settingsButton(n), s = hudSize(n);
+  const [x, y] = settingsButton(n), s = statusSize(n);
   if (n.retro) { retroSprite(n, RETRO.settings, x, y, '#c9a640', 0.9); return; }
   const path = new RenderPath();
   for (const [dx, notch] of [[-0.33, -0.18], [0, 0.18], [0.33, -0.03]]) {
@@ -150,8 +154,9 @@ export function chevron(n: Neon, x: number, y: number, dx: number, dy: number, s
 function drawTouch(g: Game) {
   const n = g.neon, inp = g.input;
   n.overlay();
-  const r = Math.min(n.fullW, n.fullH) * 0.11, gap = r * 1.2, size = r * 0.26;
   const portraitTop = inp.gestureTop?.() ?? 0;
+  const r = Math.min(Math.min(n.fullW, n.fullH) * 0.11, portraitTop ? (n.fullH - portraitTop) / 3.6 : Infinity);
+  const gap = r * 1.2, size = r * 0.26;
   const leftY = portraitTop ? Math.max(portraitTop + r * 1.6, n.fullH - r * 2) : n.fullH - r * 1.6;
   const rightY = portraitTop ? leftY : n.fullH - r * 1.7;
   // Left thumb: a stick that walks, floats and goes through the line.
@@ -193,7 +198,6 @@ function drawSurround(g: Game) {
   if (n.fullH > n.fullW && !g.input.gestureTop) n.text('turn the phone for a bigger view', n.w / 2, -n.oy / 2, Math.max(13, n.unit * 8), '#c9a640', 'center', 0.8);
 }
 
-/** The beats of the bar, as dots ending at x, with the current one lit. */
 /** How much line is left behind Wavell before the break: the time you have. */
 function drawLead(g: Game, x: number, y: number, s: number) {
   const n = g.neon, W = g.wavell;
@@ -239,33 +243,32 @@ function drawBoss(g: Game, cx: number, y: number, s: number) {
   }
 }
 
-function drawSizes(g: Game, x: number, y: number) {
+function drawSizes(g: Game, x: number, y: number, s: number) {
   const n = g.neon, W = g.wavell, top = -Math.PI / 2;
+  const unit = s / 9;
   if (n.retro) {
-    const [sx, sy] = n.toScreen(x, y);
     for (let i = 0; i < DIFF.growMax; i++) {
-      const cx = sx + i * 11 * n.unit;
-      retroSprite(n, i < W.size ? RETRO.face : RETRO.ring, cx, sy, COLORS.wavell, i < W.size ? 1 : 0.3);
-      if (i === W.size && W.sparks > 0) retroSprite(n, ringPart(W.sparks / DIFF.sparksPerSize), cx, sy, COLORS.wavell);
+      const cx = x + i * 11 * unit;
+      retroSprite(n, i < W.size ? RETRO.face : RETRO.ring, cx, y, COLORS.wavell, i < W.size ? 1 : 0.3);
+      if (i === W.size && W.sparks > 0) retroSprite(n, ringPart(W.sparks / DIFF.sparksPerSize), cx, y, COLORS.wavell);
     }
-    n.world();
     return;
   }
   for (let i = 0; i < DIFF.growMax; i++) {
-    const cx = x + i * 11, whole = i < W.size;
+    const cx = x + i * 11 * unit, whole = i < W.size;
     const ring = new RenderPath();
-    ring.arc(cx, y, 4, 0, Math.PI * 2);
-    n.glow(ring, COLORS.wavell, 0.4, whole ? 0 : 0.3);
+    ring.arc(cx, y, 4 * unit, 0, Math.PI * 2);
+    n.glow(ring, COLORS.wavell, 0.4 * unit, whole ? 0 : 0.3);
     if (whole) {
       const p = new RenderPath();
-      p.arc(cx, y, 4, 0, Math.PI * 2);
-      p.moveTo(cx - 2.2, y - 1.4); p.lineTo(cx - 0.8, y - 0.8);
-      p.moveTo(cx + 2.2, y - 1.4); p.lineTo(cx + 0.8, y - 0.8);
-      n.glow(p, COLORS.wavell, 0.75);
+      p.arc(cx, y, 4 * unit, 0, Math.PI * 2);
+      p.moveTo(cx - 2.2 * unit, y - 1.4 * unit); p.lineTo(cx - 0.8 * unit, y - 0.8 * unit);
+      p.moveTo(cx + 2.2 * unit, y - 1.4 * unit); p.lineTo(cx + 0.8 * unit, y - 0.8 * unit);
+      n.glow(p, COLORS.wavell, 0.75 * unit);
     } else if (i === W.size && W.sparks > 0) {
       const p = new RenderPath();
-      p.arc(cx, y, 4, top, top + Math.PI * 2 * W.sparks / DIFF.sparksPerSize);
-      n.glow(p, COLORS.wavell, 0.85);
+      p.arc(cx, y, 4 * unit, top, top + Math.PI * 2 * W.sparks / DIFF.sparksPerSize);
+      n.glow(p, COLORS.wavell, 0.85 * unit);
     }
   }
 }
@@ -292,14 +295,14 @@ export function drawHud(g: Game) {
     g.titleDust?.draw(n);
     n.fade = hudFade;
     if (g.mode === 'play') {
+      if (portraitHud(n)) { n.overlay(); n.screen(); }
+      const size = statusSize(n), x = size * 0.9, y = statusTop(n) + Math.max(22, size * 1.1);
       const score = g.multiplier > 1 ? `×${g.multiplier}  ${g.score}` : String(g.score);
       const [buttonX, buttonY, buttonRadius] = settingsButton(n);
-      n.text(score, Math.min(n.w - s * SCORE_RIGHT, buttonX - buttonRadius - s * 0.25), buttonY, s * 0.68, COLORS.hud, 'right', 0.78);
-      if (g.boss) drawBoss(g, cx, pad, s);
-      n.world();
-      drawSizes(g, n.camX + (pad / n.unit) + 4, n.viewTop + pad / n.unit + 1);
-      n.screen();
-      drawLead(g, pad, pad + s * 1.4, s);
+      n.text(score, Math.min(n.w - size * SCORE_RIGHT, buttonX - buttonRadius - size * 0.25), buttonY, size * 0.68, COLORS.hud, 'right', 0.78);
+      if (g.boss) drawBoss(g, cx, y, size);
+      drawSizes(g, x + size * 4 / 9, y, size);
+      drawLead(g, x, y + size * 1.2, size);
     }
     if (g.banner > 0) n.text(g.bannerText || g.levelLabel, cx, n.lineY - n.unit * 70, s * 1.65, COLORS.hud, 'center', Math.min(1, g.banner));
     if (g.hintT > 0 && g.mode === 'play') n.text(g.hint, cx, pad + s * 2.4, s * 0.62, '#ffd77a', 'center', Math.min(1, g.hintT));
@@ -314,6 +317,7 @@ export function drawHud(g: Game) {
     }
   }
   n.fade = 1;
+  if (portraitHud(n)) n.overlay();
   n.screen();
   if (!g.audio.open) drawSettings(n);
   drawSurround(g);

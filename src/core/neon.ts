@@ -1,7 +1,7 @@
 // Canvas 2D renderer for neon-style vector strokes.
 //
-// World units are the original game's pixels. Every screen shows the same play area,
-// VIEW_W x VIEW_H of them, scaled to the screen's real pixel density so strokes stay
+// World units are the original game's pixels. The standard play area is
+// VIEW_W x VIEW_H, scaled to the screen's real pixel density so strokes stay
 // sharp on any phone. Whatever the area doesn't fill is left empty around it, which is
 // where a phone's thumbs go. World y = 0 is the line's rest height; negative y is up.
 
@@ -46,7 +46,7 @@ export function smoothPath(p: Pts, path = new RenderPath(), move = true): Render
   return path;
 }
 
-/** The play area in world units: the same on every platform, so nobody sees further ahead. */
+/** The standard play area in world units. Portrait play crops its sides. */
 export const VIEW_H = 200;
 export const VIEW_W = (VIEW_H * 16) / 9;
 

@@ -253,13 +253,13 @@ describe('the play area', () => {
     expect(fitArea(1920, 1080)).toEqual({ w: 1920, h: 1080, x: 0, y: 0 });
   });
 
-  it('reserves the area below the fixed view for portrait play gestures', () => {
+  it('reserves the area below the centred portrait view for play gestures', () => {
     const inset = 45;
     const { input, send } = touchScreen(390, 844, inset);
     const area = fitGameArea(390, 844);
     const cutoff = area.y + area.h + inset;
-    expect(area.w / area.h).toBeCloseTo(RATIO);
-    expect(area.y + area.h).toBeLessThan(300);
+    expect(area.w / area.h).toBeCloseTo(RATIO / 1.15);
+    expect(area.y + area.h / 2).toBeCloseTo(844 / 2, 0);
     bindGameInputLayout({ mode: 'play', input, neon: { fullW: 390, fullH: 844, oy: area.y, h: area.h } } as unknown as Game);
     send('pointerdown', 1, 85, cutoff - 1);
     send('pointermove', 1, 115, cutoff - 1);

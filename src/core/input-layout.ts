@@ -1,10 +1,13 @@
 import { fitArea } from './neon';
 import type { Game } from '../game/game';
 
-/** Reserve the area below the fixed 16:9 viewport for portrait touch gestures. */
+/** In portrait, centre the taller crop and keep the space below it for gestures. */
 export function fitGameArea(width: number, height: number) {
   const area = fitArea(width, height);
-  if (height > width) area.y = Math.round(Math.min(24, (height - area.h) / 5));
+  if (height > width) {
+    area.h *= 1.15;
+    area.y = Math.round((height - area.h) / 2);
+  }
   return area;
 }
 
