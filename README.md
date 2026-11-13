@@ -21,7 +21,7 @@ Your world is a line. You are a wave on it, and the end of the line is coming.
 
 **To just play or test**, open the link above. It always runs the latest version of `main`, and needs no install. Bugs and impressions go in [the issues](https://github.com/matamadio/the-line/issues/new/choose).
 
-**To work on it**, you need [Node.js](https://nodejs.org) 20 or newer:
+**To work on it**, you need [Node.js](https://nodejs.org) 20 or newer and [FFmpeg](https://ffmpeg.org/download.html) on PATH with the MP3 and Vorbis encoders. Vite runs AssetPack to generate optimized sound effects from the original WAVs.
 
 ```bash
 git clone https://github.com/matamadio/the-line.git
@@ -59,11 +59,11 @@ In the menu, ↑ goes to the line behind and ↓ to the one before, round and ro
 
 The one rule to remember: **pull in what is close on your side, wipe what is on the other.** The wrong attack feeds a creature and it grows. Each enemy is explained the first time it appears. [docs/RULES.md](docs/RULES.md) lists every rule with its numbers: controls, enemies, scoring, levels, music and the beat. [docs/DESIGN.md](docs/DESIGN.md) explains the design behind them.
 
-Every screen shows the same play area, 16:9 and 356x200 world units, so nobody sees further ahead than anyone else. Whatever it doesn't fill stays empty around it.
+Every screen shows the same 16:9 play area, 356x200 world units, so nobody sees further ahead than anyone else.
 
 ### On a phone
 
-Hold the phone sideways. The corners icon goes fullscreen, except on iPhones, which don't allow it for web pages.
+In portrait, the play area sits above the two touch gesture zones. In landscape, the play area fits the available screen and the touch controls sit near the lower corners. The corners icon goes fullscreen, except on iPhones.
 
 To install the game as an app, which also lets it play offline:
 
@@ -194,7 +194,8 @@ The real stroke is drawn over a grid, with the keys either side shown faintly (o
 ## Project layout
 
 ```text
-index.html, lab.html, difficulty.html    The three pages
+index.html, lab.html, difficulty.html    Game and editors
+pixi-compare.html                        Experimental Canvas 2D and PixiJS comparison
 src/
   main.ts          Starts the game
   core/            Knows nothing about the game: canvas renderer, input, audio, fullscreen and install
@@ -209,6 +210,7 @@ src/
     actors/        Wavell, Sinepede, Disturchin, Worm, Bubble Burst, the Flattener (the boss), and the retired Snawave
   data/            The tunable numbers and the files the editors save
   editors/         The difficulty editor and the animation lab
+  prototypes/      The renderer comparison
 test/              Headless tests: the real simulation, no browser
 tools/             The dev server's save endpoint for the editors, the build's service worker
 public/            Sounds, app icons and the app manifest
@@ -229,6 +231,14 @@ docs/              Game rules reference (RULES.md), design notes and the origina
 | `npm run preview` | Serves `dist/` to try out the build |
 
 `dist/` can be hosted anywhere, under any path. It needs a web server, because browsers refuse to load it from a `file://` address.
+
+### Renderer comparison
+
+Run `npm run dev` and open `/pixi-compare.html`. Both panels draw the same vibrating line, with the game's Canvas 2D glow on one side and an additive PixiJS mesh on the other. Click or tap either panel to send a pulse through both. Pause to compare a still frame, or reset to replay the opening waves. The Pixi panel requires WebGL.
+
+To try the full game in Pixi, open `/?renderer=pixi`. Use `/?renderer=canvas` to select Canvas explicitly. The game currently defaults to Canvas and falls back to it if WebGL fails to start or its context is lost. In Pixi, open the speaker menu to toggle **Bloom**. The effect is off by default and is suspended in Nostalgia mode.
+
+See [the migration plan and benchmark commands](pixi-migration-plan.md) for the promotion gates.
 
 ## Contributing
 

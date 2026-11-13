@@ -30,7 +30,11 @@ const PAD_STICK = 0.5;
 /** The standard layout: the buttons that work in menus whatever the bindings are. */
 const PAD_CONFIRM = [0, 9], PAD_BACK = 1, PAD_MENU = 8, PAD_UP = 12, PAD_DOWN = 13, PAD_LEFT = 14, PAD_RIGHT = 15;
 
-interface Held { left: boolean; right: boolean; up: boolean; down: boolean; drag: boolean; pull: boolean }
+const DIRECTIONS = ['left', 'right', 'up', 'down'] as const;
+type Direction = typeof DIRECTIONS[number];
+type Held = Record<Direction, boolean>;
+type TouchAction = 'up' | 'down' | 'drag' | 'pull';
+const noDirections = (): Held => ({ left: false, right: false, up: false, down: false });
 
 /** The part of the screen, from the left, where a touch becomes the stick. */
 const STICK_ZONE = 0.45;
@@ -48,6 +52,8 @@ const SWIPE_TRAVEL = 0.8;
 const clamp = (v: number, a: number, b: number) => (v < a ? a : v > b ? b : v);
 
 export class Input implements Controls {
+  /** Changes when queued gameplay presses must be discarded. */
+  resetEpoch = 0;
   left = false; right = false; up = false; down = false;
   upPressed = false; downPressed = false; dragPressed = false; pullPressed = false;
   /** Any key or touch this frame (for menus). */
@@ -82,7 +88,7 @@ export class Input implements Controls {
   /** -1 or 1 for a moment after the stick goes up or down. */
   stickFlash = 0;
 
-  private keys: Held = { left: false, right: false, up: false, down: false, drag: false, pull: false };
+  private keys = new Set<string>();
   private keyMap = new Map<string, Action>();
   private latch = {
     up: false, down: false, drag: false, pull: false, any: false, pause: false,
@@ -91,10 +97,15 @@ export class Input implements Controls {
   private tapAt: [number, number] | null = null;
   private swipeAt = 0;
   private downs = new Map<number, [number, number]>();
-  private stickHeld = { left: false, right: false, up: false, down: false };
-  private padHeld = { left: false, right: false, up: false, down: false };
+  private stickHeld = noDirections();
+  private touchPressed = new Map<number, Set<TouchAction>>();
+  private padHeld = noDirections();
   private padPrev: boolean[] = [];
-  private ui: { id: number; run: () => void } | null = null;
+  private padIndex: number | undefined;
+  private padNeedsNeutral = false;
+  private focused = true;
+  private surfaceEvents: AbortController | null = null;
+  private ui = new Map<number, () => void>();
   readonly onKey = new Map<string, () => void>();
   /**
    * On-screen buttons get first refusal on a touch: this returns what the button does, or null.
@@ -102,6 +113,8 @@ export class Input implements Controls {
    * from there, not from the moment a finger lands.
    */
   uiTap: ((x: number, y: number) => (() => void) | null) | null = null;
+  /** CSS y coordinate where play gestures can start. Menu and HUD taps still use the whole view. */
+  gestureTop: (() => number) | null = null;
   /** Every lifted finger or pressed key, the moments a browser lets a page start sound. */
   onGesture: (() => void) | null = null;
 
@@ -126,29 +139,34 @@ export class Input implements Controls {
       if (!k) return;
       e.preventDefault();
       if (k === 'pause') { l.pause = true; return; }
-      this.keys[k] = true;
+      this.keys.add(e.code);
       if (k === 'up' || k === 'down' || k === 'drag' || k === 'pull') l[k] = true;
     });
     window.addEventListener('mousemove', (e) => { [this.mouseX, this.mouseY] = this.pos(e); });
-    window.addEventListener('keyup', (e) => { const k = this.keyMap.get(e.code); if (k && k !== 'pause') this.keys[k] = false; });
-    window.addEventListener('blur', () => { for (const k of Object.keys(this.keys) as (keyof Held)[]) this.keys[k] = false; });
-
-    el.addEventListener('pointerdown', (e) => {
-      e.preventDefault();
-      try { el.setPointerCapture(e.pointerId); } catch { /* pointer already gone */ }
-      if (e.pointerType !== 'mouse') this.touchUsed = true;
-      const [x, y] = this.pos(e);
-      const run = this.uiTap?.(x, y);
-      if (run) { this.ui = { id: e.pointerId, run }; return; }
-      this.latch.any = true;
-      this.downs.set(e.pointerId, [x, y]);
-      if (x < el.getBoundingClientRect().width * STICK_ZONE && !this.stick) {
-        this.stick = { id: e.pointerId, ox: x, oy: y, x, y };
-      } else {
-        // The latest finger on the right is the one that counts, so attacks can overlap.
-        this.swipe = { id: e.pointerId, ox: x, oy: y, fired: false };
-      }
+    window.addEventListener('keyup', (e) => { this.keys.delete(e.code); });
+    window.addEventListener('blur', () => {
+      this.focused = false;
+      this.keys.clear();
+      this.clearPointers();
+      this.padHeld = noDirections();
+      this.padPrev = [];
+      this.padNeedsNeutral = true;
+      this.clearPresses();
     });
+    window.addEventListener('focus', () => { this.focused = true; });
+    window.addEventListener('resize', () => { this.clearPointers(); });
+    this.setSurface(el);
+  }
+
+  /** Pixi can start pointers through its event system. Native capture still handles moves and releases. */
+  setSurface(el: HTMLElement, { pointerDown = 'native' }: { pointerDown?: 'native' | 'pixi' } = {}) {
+    this.surfaceEvents?.abort();
+    this.clearPointers();
+    this.el = el;
+    const controller = new AbortController();
+    this.surfaceEvents = controller;
+    const options = { signal: controller.signal };
+    if (pointerDown === 'native') el.addEventListener('pointerdown', (e) => this.pointerDown(e), options);
     el.addEventListener('pointermove', (e) => {
       const [x, y] = this.pos(e), s = this.stick;
       if (s && s.id === e.pointerId) {
@@ -156,19 +174,23 @@ export class Input implements Controls {
         return;
       }
       if (this.swipe?.id === e.pointerId) this.readSwipe(x, y);
-    });
+    }, options);
     const end = (e: PointerEvent) => {
       if (e.type === 'pointerup') this.onGesture?.();
       const down = this.downs.get(e.pointerId);
       this.downs.delete(e.pointerId);
+      if (down && e.type !== 'pointerup') {
+        this.touchPressed.delete(e.pointerId);
+        this.resetEpoch++;
+      }
       if (down && e.type === 'pointerup') {
         const [x, y] = this.pos(e), dx = x - down[0], dy = y - down[1], far = Math.hypot(dx, dy) > this.threshold * SWIPE_TRAVEL;
         if (!far) this.tapAt = [x, y];
         else if (Math.abs(dy) > Math.abs(dx)) this.swipeAt = Math.sign(dy);
       }
-      if (this.ui?.id === e.pointerId) {
-        const run = this.ui.run;
-        this.ui = null;
+      const run = this.ui.get(e.pointerId);
+      if (run) {
+        this.ui.delete(e.pointerId);
         if (e.type === 'pointerup') run();
         return;
       }
@@ -184,8 +206,51 @@ export class Input implements Controls {
         this.swipe = null;
       }
     };
-    el.addEventListener('pointerup', end);
-    el.addEventListener('pointercancel', end);
+    el.addEventListener('pointerup', end, options);
+    el.addEventListener('pointercancel', end, options);
+    el.addEventListener('lostpointercapture', end, options);
+  }
+
+  pointerDown(e: Pick<PointerEvent, 'pointerId' | 'pointerType' | 'clientX' | 'clientY' | 'preventDefault'>, target?: (() => void) | null) {
+    e.preventDefault();
+    if (e.pointerType !== 'mouse') this.touchUsed = true;
+    const [x, y] = this.pos(e);
+    const run = target === undefined ? this.uiTap?.(x, y) : target;
+    if (!run && this.gestureTop && y < this.gestureTop()) return;
+    try { this.el.setPointerCapture(e.pointerId); } catch { /* pointer already gone */ }
+    if (run) { this.ui.set(e.pointerId, run); return; }
+    this.latch.any = true;
+    this.downs.set(e.pointerId, [x, y]);
+    if (x < this.el.getBoundingClientRect().width * STICK_ZONE && !this.stick) {
+      this.stick = { id: e.pointerId, ox: x, oy: y, x, y };
+    } else {
+      // The latest finger on the right is the one that counts, so attacks can overlap.
+      this.swipe = { id: e.pointerId, ox: x, oy: y, fired: false };
+    }
+  }
+
+  private clearPointers() {
+    this.resetEpoch++;
+    for (const id of [...this.downs.keys(), ...this.ui.keys()]) {
+      try { this.el.releasePointerCapture(id); } catch { /* no longer captured */ }
+    }
+    this.downs.clear();
+    this.ui.clear();
+    this.stick = this.swipe = null;
+    this.stickHeld = noDirections();
+    this.tapAt = null;
+    this.swipeAt = 0;
+    this.touchPressed.clear();
+  }
+
+  private clearPresses() {
+    for (const key of Object.keys(this.latch) as (keyof typeof this.latch)[]) this.latch[key] = false;
+  }
+
+  private latchTouch(id: number, action: TouchAction) {
+    let presses = this.touchPressed.get(id);
+    if (!presses) { presses = new Set(); this.touchPressed.set(id, presses); }
+    presses.add(action);
   }
 
   get threshold() { return Math.min(window.innerWidth, window.innerHeight) * 0.045; }
@@ -203,8 +268,8 @@ export class Input implements Controls {
     const dx = x - w.ox, dy = y - w.oy;
     if (Math.hypot(dx, dy) <= this.threshold * SWIPE_TRAVEL) return;
     w.fired = true;
-    if (Math.abs(dx) > Math.abs(dy)) { this.latch.pull = true; this.pullFlash = 1; }
-    else { this.latch.drag = true; this.dragFlash = 1; }
+    if (Math.abs(dx) > Math.abs(dy)) { this.latchTouch(w.id, 'pull'); this.pullFlash = 1; }
+    else { this.latchTouch(w.id, 'drag'); this.dragFlash = 1; }
   }
 
   /**
@@ -230,8 +295,8 @@ export class Input implements Controls {
     const go = th * STICK_VERTICAL, keep = go * STICK_RELEASE;
     const up = h.up ? dy < -keep : dy < -go && -dy > Math.abs(dx);
     const down = h.down ? dy > keep : dy > go && dy > Math.abs(dx);
-    if (up && !h.up) { this.latch.up = true; this.stickFlash = -1; }
-    if (down && !h.down) { this.latch.down = true; this.stickFlash = 1; }
+    if (up && !h.up) { this.latchTouch(s.id, 'up'); this.stickFlash = -1; }
+    if (down && !h.down) { this.latchTouch(s.id, 'down'); this.stickFlash = 1; }
     h.up = up; h.down = down;
   }
 
@@ -240,20 +305,40 @@ export class Input implements Controls {
     this.binds = b;
     this.keyMap.clear();
     for (const { action } of ACTIONS) for (const code of b.keys[action]) this.keyMap.set(code, action);
-    for (const k of Object.keys(this.keys) as (keyof Held)[]) this.keys[k] = false;
+    this.keys.clear();
+    this.resetEpoch++;
   }
 
   /** What the joypad has done since the last frame, as if it were keys. */
   private pollPad() {
+    if (!this.focused) return;
     let pad: Gamepad | null = null;
     try { pad = [...(navigator.getGamepads?.() ?? [])].find((p) => p?.connected) ?? null; } catch { /* not allowed in this page */ }
     const h = this.padHeld, l = this.latch;
-    if (!pad) { h.left = h.right = h.up = h.down = false; this.padPrev = []; return; }
+    if (!pad) {
+      if (this.padIndex !== undefined) this.resetEpoch++;
+      this.padHeld = noDirections();
+      this.padPrev = [];
+      this.padIndex = undefined;
+      this.padNeedsNeutral = false;
+      return;
+    }
     this.padFound = true;
-    const now = pad.buttons.map((b) => b.pressed), before = this.padPrev;
+    const now = pad.buttons.map((b) => b.pressed);
+    const x = pad.axes[0] ?? 0, y = pad.axes[1] ?? 0;
+    if (this.padNeedsNeutral) {
+      this.padNeedsNeutral = now.some(Boolean) || Math.abs(x) > PAD_STICK || Math.abs(y) > PAD_STICK;
+      if (this.padNeedsNeutral) return;
+    }
+    if (pad.index !== this.padIndex) {
+      if (this.padIndex !== undefined) this.resetEpoch++;
+      Object.assign(h, noDirections());
+      this.padPrev = [];
+      this.padIndex = pad.index;
+    }
+    const before = this.padPrev;
     this.padPrev = now;
     const isDown = (a: Action) => this.binds.pad[a].some((b) => now[b]);
-    const x = pad.axes[0] ?? 0, y = pad.axes[1] ?? 0;
     const held = { left: isDown('left') || x < -PAD_STICK, right: isDown('right') || x > PAD_STICK, up: isDown('up') || y < -PAD_STICK, down: isDown('down') || y > PAD_STICK };
     const stick = { left: x < -PAD_STICK, right: x > PAD_STICK, up: y < -PAD_STICK, down: y > PAD_STICK };
     for (let i = 0; i < now.length; i++) {
@@ -285,11 +370,14 @@ export class Input implements Controls {
   /** Call once per frame before reading the controls. */
   poll() {
     this.pollPad();
-    const k = this.keys, s = this.stickHeld, p = this.padHeld, l = this.latch;
-    this.left = k.left || s.left || p.left;
-    this.right = k.right || s.right || p.right;
-    this.up = k.up || s.up || p.up;
-    this.down = k.down || s.down || p.down;
+    const s = this.stickHeld, p = this.padHeld, l = this.latch;
+    for (const action of DIRECTIONS) {
+      this[action] = s[action] || p[action] || this.binds.keys[action].some((code) => this.keys.has(code));
+    }
+    for (const presses of this.touchPressed.values()) {
+      for (const action of presses) l[action] = true;
+    }
+    this.touchPressed.clear();
     this.upPressed = l.up;
     this.downPressed = l.down;
     this.dragPressed = l.drag;
@@ -306,6 +394,15 @@ export class Input implements Controls {
     this.swipeV = this.swipeAt;
     this.tapAt = null;
     this.swipeAt = 0;
-    for (const key of Object.keys(l) as (keyof typeof l)[]) l[key] = false;
+    this.clearPresses();
+  }
+
+  /** Read the merged gameplay actions without copying UI state or event handlers. */
+  controls(): Controls {
+    return {
+      left: this.left, right: this.right, up: this.up, down: this.down,
+      upPressed: this.upPressed, downPressed: this.downPressed,
+      dragPressed: this.dragPressed, pullPressed: this.pullPressed,
+    };
   }
 }

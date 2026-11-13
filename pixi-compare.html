@@ -1,0 +1,36 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>The Line — Renderer comparison</title>
+    <link rel="icon" href="./favicon.svg">
+    <link rel="stylesheet" href="./src/prototypes/pixi-compare.css">
+  </head>
+  <body>
+    <main>
+      <a href="./index.html">← The Line</a>
+      <h1>Renderer comparison</h1>
+      <p>Both panels show the same wave. Tap either panel or use Pulse to disturb the line.</p>
+      <div class="controls" aria-label="Wave controls">
+        <button id="pulse" type="button">Pulse</button>
+        <button id="pause" type="button">Pause</button>
+        <button id="reset" type="button">Reset</button>
+      </div>
+      <div class="comparison">
+        <section aria-labelledby="canvas-label">
+          <h2 id="canvas-label">Canvas 2D</h2>
+          <div class="viewport"><canvas id="canvas" aria-label="Canvas 2D rendering of the wave"></canvas></div>
+        </section>
+        <section aria-labelledby="pixi-label">
+          <h2 id="pixi-label">PixiJS · WebGL</h2>
+          <div class="viewport">
+            <canvas id="pixi" aria-label="PixiJS rendering of the wave"></canvas>
+            <p id="pixi-status" role="status">Starting WebGL…</p>
+          </div>
+        </section>
+      </div>
+    </main>
+    <script type="module" src="./src/prototypes/pixi-compare.ts"></script>
+  </body>
+</html>

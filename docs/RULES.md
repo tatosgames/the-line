@@ -313,13 +313,14 @@ Everything is drawn as glowing vector strokes at the screen's native resolution.
 - **Screens.** The title is one unbroken stroke. Starting a game breaks it apart. At game over, FLATLINED appears and turns back into the title.
 - **HUD.** Top left: size circles, with the lead gauge under them. Score with its multiplier to the left. Points pop up where they are earned. A banner shows each new level. During the boss fight, THE FLATTENER and a circle for each size he has left sit under the level.
 - **Nostalgia mode** (N or the checkerboard icon) gives a low-resolution look and is saved in the browser.
+- **Bloom** is available in the speaker menu when using the experimental Pixi renderer. It defaults to off, is saved separately, and is suspended in Nostalgia mode.
 
 ## Platform and saving
 
 The game runs in the browser at <https://matamadio.github.io/the-line/> and installs as an app (PWA), which also lets it play offline.
 
 - **Saved in the browser:** best score, key bindings, audio choices (mute, style, time signature) and Nostalgia mode. Nothing is saved online.
-- **Phones:** play held sideways. The corners icon goes fullscreen, except on iPhone. Install from the start screen's install button; on iPhone, from the Share menu.
+- **Phones:** the game fits the same 16:9 play area in either orientation. In portrait, start movement and attack gestures below the play area. In landscape, the thumb controls are near the lower corners. The corners icon goes fullscreen, except on iPhone. Install from the start screen's install button; on iPhone, from the Share menu.
 - **Shared origin:** several apps live on matamadio.github.io, so the manifest needs its own explicit id (`/the-line/`).
 - **Sound** only starts after the first tap or key press, as browsers require.
 

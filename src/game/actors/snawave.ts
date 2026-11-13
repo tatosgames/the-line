@@ -6,6 +6,7 @@
 // The game no longer sends these: the Sinepede took over as the basic enemy. It stays
 // for the keyframe editor, which edits its outline and motions.
 
+import { RenderPath } from '../../core/renderPath';
 import type { SpringLine } from '../line';
 import { DIFF } from '../../data/difficulty';
 import { TUNE } from '../../data/tune';
@@ -163,7 +164,7 @@ export class Snawave {
   drawFeatures(neon: Neon, line: SpringLine) {
     if (this.g * this.squash < 0.05 || (this.state === 'die' && this.t > 0.08)) return;
     const P = this.tf(line);
-    const feat = new Path2D();
+    const feat = new RenderPath();
     const a = Math.sin(this.time * 4) * 1.2;
     smoothPath([...P(14, 23), ...P(11 + a * 0.3, 18.5), ...P(12.5 + a, 14.5), ...P(10.2 + a, 12.6)], feat);
     polyPath([...P(12.5 + a, 14.5), ...P(14.8 + a, 13.4)], false, feat);
@@ -181,10 +182,10 @@ export class Snawave {
       polyPath(lo, false, feat);
     }
     neon.glow(feat, COLORS.enemy, 0.7, this.intensity);
-    const eye = new Path2D();
+    const eye = new RenderPath();
     polyPath([...P(4.6, 27.4), ...P(7.8, 26)], false, eye);
     neon.glow(eye, COLORS.eye, 1.1, this.intensity);
-    const glint = new Path2D();
+    const glint = new RenderPath();
     const [gx, gy] = P(6.4, 26.6);
     glint.arc(gx, gy, 0.35, 0, Math.PI * 2);
     neon.glow(glint, COLORS.white, 0.5);

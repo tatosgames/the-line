@@ -2,6 +2,7 @@
 // Sound on or off, the music style and the time signature. While it is open the game
 // waits, and the music plays on its own so a choice can be heard straight away.
 
+import { RenderPath } from '../core/renderPath';
 import { audioPrefs, saveAudioPrefs } from '../core/audioPrefs';
 import type { Input } from '../core/input';
 import { METERS, meterById } from '../core/music';
@@ -10,9 +11,10 @@ import { sfx } from '../core/sfx';
 import type { Game } from './game';
 import { hudSize } from './hud';
 
-type Row = 'sound' | 'style' | 'meter' | 'close';
+type Row = 'sound' | 'style' | 'meter' | 'bloom' | 'close';
 const ROWS: readonly Row[] = ['sound', 'style', 'meter', 'close'];
-const LABELS: Record<Row, string> = { sound: 'SOUND', style: 'MUSIC', meter: 'TIME', close: 'CLOSE' };
+const PIXI_ROWS: readonly Row[] = ['sound', 'style', 'meter', 'bloom', 'close'];
+const LABELS: Record<Row, string> = { sound: 'SOUND', style: 'MUSIC', meter: 'TIME', bloom: 'BLOOM', close: 'CLOSE' };
 const GOLD = '#c9a640';
 /** The window's size and the rows' spacing, in HUD sizes. */
 const BOX_W = 15, ROW_TOP = 2.5, ROW_H = 1.3, FOOT = 1.6;
@@ -35,9 +37,10 @@ export class AudioMenu {
   }
 
   hide() { this.open = false; }
+  private get rows() { return this.g.neon.bloomAvailable ? PIXI_ROWS : ROWS; }
 
   private box(n: Neon) {
-    const s = hudSize(n), w = s * BOX_W, h = s * (ROW_TOP + ROWS.length * ROW_H + FOOT);
+    const s = hudSize(n), w = s * BOX_W, h = s * (ROW_TOP + this.rows.length * ROW_H + FOOT);
     return { s, x: (n.w - w) / 2, y: (n.h - h) / 2, w, h };
   }
 
@@ -48,14 +51,16 @@ export class AudioMenu {
 
   private rowAt(y: number) {
     const b = this.box(this.g.neon), i = Math.round((y - b.y) / b.s / ROW_H - ROW_TOP / ROW_H);
-    return i >= 0 && i < ROWS.length ? i : null;
+    return i >= 0 && i < this.rows.length ? i : null;
   }
 
   /** Once a frame while it is open. */
   handle(inp: Input) {
     const n = this.g.neon;
-    if (inp.menuUp) this.row = mod(this.row - 1, ROWS.length);
-    if (inp.menuDown) this.row = mod(this.row + 1, ROWS.length);
+    const rows = this.rows;
+    this.row = Math.min(this.row, rows.length - 1);
+    if (inp.menuUp) this.row = mod(this.row - 1, rows.length);
+    if (inp.menuDown) this.row = mod(this.row + 1, rows.length);
     // The mouse picks a row only when it moves, so it doesn't fight with the keys.
     if (inp.mouseX !== this.mouseX || inp.mouseY !== this.mouseY) {
       this.mouseX = inp.mouseX;
@@ -63,9 +68,9 @@ export class AudioMenu {
       const over = this.rowAt(inp.mouseY - n.oy);
       if (over !== null && this.inBox(inp.mouseX - n.ox, inp.mouseY - n.oy)) this.row = over;
     }
-    if (inp.menuLeft) this.change(ROWS[this.row], -1);
-    if (inp.menuRight) this.change(ROWS[this.row], 1);
-    if (inp.confirm) this.change(ROWS[this.row], 1);
+    if (inp.menuLeft) this.change(rows[this.row], -1);
+    if (inp.menuRight) this.change(rows[this.row], 1);
+    if (inp.confirm) this.change(rows[this.row], 1);
   }
 
   private inBox(x: number, y: number) {
@@ -80,11 +85,12 @@ export class AudioMenu {
     if (i === null) return () => {};
     // The left of the value goes back through the choices, the rest goes on.
     const back = x < this.g.neon.w / 2 + this.box(this.g.neon).s * 1.6;
-    return () => { this.row = i; this.change(ROWS[i], back ? -1 : 1); };
+    return () => { this.row = i; this.change(this.rows[i], back ? -1 : 1); };
   }
 
   private change(row: Row, d: number) {
     if (row === 'close') { this.g.closeAudio(); return; }
+    if (row === 'bloom') { this.g.neon.toggleBloom(); return; }
     if (row === 'sound') sfx.toggleMute();
     else if (row === 'style') sfx.cycleStyle(d);
     else {
@@ -100,25 +106,25 @@ export class AudioMenu {
     if (row === 'sound') return sfx.muted ? 'OFF' : 'ON';
     if (row === 'style') return sfx.style.name;
     if (row === 'meter') return meterById(audioPrefs.meter).id;
+    if (row === 'bloom') return this.g.neon.bloom ? 'ON' : 'OFF';
     return '';
   }
 
   draw() {
-    const n = this.g.neon, c = n.ctx, b = this.box(n), s = b.s, inp = this.g.input, touch = inp.touchUsed;
+    const n = this.g.neon, b = this.box(n), s = b.s, inp = this.g.input, touch = inp.touchUsed;
+    n.modal();
     n.screen();
     // The game dims behind the window.
-    c.globalCompositeOperation = 'source-over';
-    c.fillStyle = 'rgba(2, 1, 7, 0.72)';
-    c.fillRect(0, 0, n.w, n.h);
+    n.fillRect(0, 0, n.w, n.h, '#020107', 0.72);
     if (n.retro) n.pixelFrame(b.x, b.y, b.w, b.h, GOLD, 0.8);
     else {
-      const frame = new Path2D();
+      const frame = new RenderPath();
       frame.rect(b.x, b.y, b.w, b.h);
       n.glow(frame, GOLD, 1, 0.5);
     }
     n.text('AUDIO', n.w / 2, b.y + s * 1.2, s * 0.9, COLORS.hud);
     const left = n.w / 2 - s * 0.6, right = n.w / 2 + s * 0.6, size = s * 0.68;
-    ROWS.forEach((row, i) => {
+    this.rows.forEach((row, i) => {
       const y = this.rowY(i), on = i === this.row, color = on ? COLORS.hud : GOLD, alpha = on ? 1 : 0.8;
       if (row === 'close') {
         n.text(on ? '> CLOSE <' : 'CLOSE', n.w / 2, y, size, color, 'center', alpha);
@@ -132,6 +138,6 @@ export class AudioMenu {
       : touch ? 'tap a choice to change it   tap outside to close'
         : '← → change   Esc close';
     n.text(foot, n.w / 2, b.y + b.h - s * 0.9, s * 0.48, GOLD, 'center', 0.8);
-    c.canvas.style.cursor = '';
+    n.cursor('');
   }
 }

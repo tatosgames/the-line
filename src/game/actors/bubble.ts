@@ -9,6 +9,7 @@
 // in the air. Attacks along the line can't reach those. Their spray pops his bubble and
 // leaves him dizzy if he is on the line under it. A fed one is too heavy to float off.
 
+import { RenderPath } from '../../core/renderPath';
 import type { SpringLine } from '../line';
 import { COLORS, Neon, clamp, lerp, smooth, smoothPath } from '../../core/neon';
 
@@ -109,12 +110,12 @@ export class BubbleBurst {
     const flicker = k > 0.75 && Math.floor(this.time * 16) % 2 === 0 ? 0.4 : 1;
     if (this.state === 'fly') {
       // No longer part of the line's stroke, so it draws its own skin.
-      const skin = new Path2D();
+      const skin = new RenderPath();
       skin.arc(cx, cy, r, 0, Math.PI * 2);
       neon.glow(skin, COLORS.line, 0.9, 1);
       neon.glow(skin, BUBBLE_GREEN, 0.9, (0.2 + 0.8 * k) * flicker);
     } else neon.glow(smoothPath(this.outline(line)), BUBBLE_GREEN, 0.9, (0.2 + 0.8 * k) * flicker);
-    const shine = new Path2D();
+    const shine = new RenderPath();
     shine.arc(cx, cy, r * 0.65, -2.4, -1.7);
     neon.glow(shine, '#ffffff', 0.4, 0.5);
   }

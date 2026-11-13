@@ -1,5 +1,6 @@
 // Sparks drawn as short glowing streaks, and floating score text.
 
+import { RenderPath } from '../core/renderPath';
 import { Neon, rand } from '../core/neon';
 
 interface Spark { x: number; y: number; vx: number; vy: number; life: number; max: number; color: string; grav: number; drag: number }
@@ -55,12 +56,12 @@ export class Fx {
   }
 
   draw(neon: Neon) {
-    const groups = new Map<string, Path2D[]>();
+    const groups = new Map<string, RenderPath[]>();
     for (const s of this.sparks) {
       const fade = Math.ceil((s.life / s.max) * 3);
       const key = s.color + '|' + fade;
       let g = groups.get(key);
-      if (!g) groups.set(key, (g = [new Path2D()]));
+      if (!g) groups.set(key, (g = [new RenderPath()]));
       g[0].moveTo(s.x, s.y);
       g[0].lineTo(s.x - s.vx * 0.025, s.y - s.vy * 0.025 + 0.01);
     }

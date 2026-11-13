@@ -1,6 +1,7 @@
 // Draws the game world: the backdrop, the line with its creatures spliced in, and
 // everything flying around it. Only reads the game's state; the HUD is in hud.ts.
 
+import { RenderPath } from '../core/renderPath';
 import { COLORS, rand, smoothPath } from '../core/neon';
 import { DIFF } from '../data/difficulty';
 import { BUBBLE_GREEN } from './actors/bubble';
@@ -10,7 +11,7 @@ import { drawHud } from './hud';
 import { BACK_LINES, backWave, depthScale } from './menu';
 
 export function drawGame(g: Game, dt: number) {
-  const n = g.neon, c = n.ctx;
+  const n = g.neon;
   n.begin(dt);
   drawBackdrop(g);
   g.menu.drawBehind();
@@ -29,7 +30,7 @@ export function drawGame(g: Game, dt: number) {
   g.boss?.drawFeatures(n, g.line, g.wavell.x);
   // A grown creature shows how many right waves it still takes, as dots off its tip.
   const pips = (x: number, y: number, count: number) => {
-    const path = new Path2D();
+    const path = new RenderPath();
     for (let i = 0; i < count; i++) {
       path.moveTo(x + (i - (count - 1) / 2) * 3.4 + 1.1, y);
       path.arc(x + (i - (count - 1) / 2) * 3.4, y, 1.1, 0, Math.PI * 2);
@@ -51,26 +52,22 @@ export function drawGame(g: Game, dt: number) {
   n.screen();
   g.menu.drawFront();
   n.screen();
-  c.globalCompositeOperation = 'source-over';
+  n.hud();
   drawHud(g);
   n.finish();
 }
 
 function drawBackdrop(g: Game) {
-  const n = g.neon, c = n.ctx;
+  const n = g.neon;
   n.screen();
-  c.globalCompositeOperation = 'lighter';
-  c.fillStyle = '#fff4c0';
   for (const s of g.stars) {
     const x = (((s.x * n.w - n.camX * n.unit * s.z) % n.w) + n.w) % n.w;
-    c.globalAlpha = (0.25 + 0.25 * Math.sin(g.time * 2 + s.p)) * s.z * 3;
-    c.fillRect(x, s.y * n.lineY * 0.95, s.s, s.s);
+    n.fillRect(x, s.y * n.lineY * 0.95, s.s, s.s, '#fff4c0', (0.25 + 0.25 * Math.sin(g.time * 2 + s.p)) * s.z * 3, true);
   }
-  c.globalAlpha = 1;
   // Two faint lines far away, scrolling slower: depth without clutter. The menu has lines of its own.
   n.fade = g.quiet || g.menu.backdropShows ? 1 : 0;
   for (const line of BACK_LINES) {
-    const p = new Path2D();
+    const p = new RenderPath();
     for (let x = -10; x <= n.w + 10; x += 6) {
       const y = n.lineY - line.off * n.unit + backWave(line, x / n.unit + n.camX, n.camX, g.time) * n.unit;
       if (x === -10) p.moveTo(x, y); else p.lineTo(x, y);
@@ -89,7 +86,7 @@ function drawLine(g: Game): Map<Sinepede, Skirts> {
   const right = n.camX + n.viewW + 10 + n.depthPad;
   // A creature burning at the end of the line is its end: nothing runs under it.
   const left = Math.max(g.endX + 7, n.camX - 10 - n.depthPad, ...g.crumbles.map((c) => c.right));
-  const path = new Path2D();
+  const path = new RenderPath();
   interface Knot { pts: number[]; x0: number; x1: number; flash: number; solo?: boolean }
   const knots: Knot[] = [];
   for (const u of g.urchins) {
@@ -169,13 +166,13 @@ function drawLine(g: Game): Map<Sinepede, Skirts> {
     i++;
   }
   const width = g.menu.lineWidthAt(g.mode === 'title' ? g.menu.z : 0);
-  n.glow(path, COLORS.line, width, 1 + (DIFF.beatOn ? g.beat.flash * 1.6 : 0));
+  n.lineGlow(path, COLORS.line, width, 1 + (DIFF.beatOn ? g.beat.flash * 1.6 : 0));
   for (const k of solo) n.glow(smoothPath(k.pts), COLORS.line, width, 1 + k.flash);
   for (const k of splice) if (k.flash > 0.05) n.glow(smoothPath(k.pts), '#ffffff', 0.8, k.flash);
   // The frayed end of the line (not while he burns: then he is its end).
   const W = g.wavell;
   if (g.endX > n.camX - 20 && !(W.state === 'dead' && W.death === 'fall') && !g.crumbles.length) {
-    const fray = new Path2D();
+    const fray = new RenderPath();
     for (let j = 0; j < 9; j++) {
       if (Math.random() < 0.15 + j * 0.06) continue;
       const x0 = g.endX + j * 1.8 - 9 + Math.random() * 0.6;
@@ -189,7 +186,7 @@ function drawLine(g: Game): Map<Sinepede, Skirts> {
 
 function drawDrops(g: Game) {
   if (!g.drops.length) return;
-  const p = new Path2D();
+  const p = new RenderPath();
   for (const d of g.drops) { p.moveTo(d.x, d.y); p.lineTo(d.x - d.vx * 0.02, d.y - d.vy * 0.02); }
   g.neon.glow(p, BUBBLE_GREEN, 1.1, 1);
 }
@@ -201,7 +198,7 @@ function drawSparkles(g: Game) {
     if (s.life < 1 && Math.floor(s.life * 10) % 2 === 0) continue;
     const tw = 0.7 + 0.3 * Math.sin(g.time * 9 + s.p);
     const r = (s.gold ? 5 : 3.4) * tw * Math.min(1, (s.max - s.life) * 4);
-    const p = new Path2D();
+    const p = new RenderPath();
     // A four-pointed twinkle.
     p.moveTo(s.x - r, s.y); p.lineTo(s.x + r, s.y);
     p.moveTo(s.x, s.y - r); p.lineTo(s.x, s.y + r);
@@ -217,7 +214,7 @@ function drawBackwaves(g: Game) {
   for (const b of g.backwaves) {
     if (b.warn > 0) {
       if (Math.floor(b.warn * 8) % 2) continue;
-      const x = Math.max(n.camX + 8, g.endX + 8), chev = new Path2D();
+      const x = Math.max(n.camX + 8, g.endX + 8), chev = new RenderPath();
       for (const o of [0, 5, 10]) {
         chev.moveTo(x + o - 2, -6);
         chev.lineTo(x + o + 2, -1);
@@ -252,7 +249,7 @@ function drawRefluxes(g: Game) {
     if (r.warn > 0) {
       if (Math.floor(r.warn * 8) % 2) continue;
       const x = n.camX + (r.dir > 0 ? 6 : n.viewW - 6), d = r.dir;
-      const chev = new Path2D();
+      const chev = new RenderPath();
       for (const o of [0, 4]) {
         chev.moveTo(x - d * (2 - o), r.y - 3);
         chev.lineTo(x + d * (1 + o), r.y);
@@ -269,7 +266,7 @@ function drawRefluxes(g: Game) {
       pts.push(tx, L.sample(tx) - r.side * r.dist + Math.sin(g.time * 30 + k * 0.9) * k * 0.22);
     }
     n.glow(smoothPath(pts), COLORS.danger, 0.8, 0.9);
-    const core = new Path2D();
+    const core = new RenderPath();
     core.moveTo(x - r.dir * 6, r.y);
     core.lineTo(x + r.dir * 1.5, r.y);
     n.glow(core, '#fff1b0', 1.6, 1.4);

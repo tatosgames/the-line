@@ -6,6 +6,7 @@
 // Unlike the Sinepede it has one rule from either side: a pull flattens it, and a wipe
 // feeds it: it grows and is pushed back.
 
+import { RenderPath } from '../../core/renderPath';
 import type { Part, Shape } from '../crumble';
 import type { SpringLine } from '../line';
 import { DIFF } from '../../data/difficulty';
@@ -179,10 +180,10 @@ export class Worm {
   /** Eye, mandibles and segment marks: everything that isn't part of the line stroke. */
   drawFeatures(neon: Neon, line: SpringLine) {
     if (this.g * this.squash < 0.1 || (this.state === 'die' && this.t > 0.08)) return;
-    const feat = new Path2D();
+    const feat = new RenderPath();
     for (const mark of this.marks(line)) polyPath(mark, false, feat);
     neon.glow(feat, COLORS.enemy, 0.6, this.intensity);
-    const eye = new Path2D();
+    const eye = new RenderPath();
     const [ex, ey] = this.tf(line)(3.4, this.depth(3.4) * 0.62);
     eye.arc(ex, ey, 0.9, 0, Math.PI * 2);
     neon.glow(eye, COLORS.eye, 0.9, this.intensity);

@@ -7,6 +7,7 @@
 // What stands at the front is always the game's real line and the real Wavell, so a game
 // starts right there. The one on its way out is a copy of the two, for the time it takes.
 
+import { RenderPath } from '../core/renderPath';
 import { ACTIONS, RESERVED_KEYS, actionLabel, bindKey, bindPad, defaultBindings, keyLabel, padLabel, saveBindings, type Action } from '../core/controls';
 import type { Captured, Controls, Input } from '../core/input';
 import { usesTouch } from '../core/input';
@@ -463,7 +464,7 @@ export class Menu {
 
   /** A line through these knots (flat points, from the left), at the depth set, from past one edge of the screen to past the other. */
   private strokeLine(sample: (x: number) => number, knots: number[][], width: number) {
-    const n = this.g.neon, left = n.camX - 10 - n.depthPad, right = n.camX + n.viewW + 10 + n.depthPad, path = new Path2D();
+    const n = this.g.neon, left = n.camX - 10 - n.depthPad, right = n.camX + n.viewW + 10 + n.depthPad, path = new RenderPath();
     path.moveTo(left, sample(left));
     let next = 0;
     for (let x = left; x <= right; x += 2) {
@@ -474,7 +475,7 @@ export class Menu {
         next++;
       } else path.lineTo(x, sample(x));
     }
-    n.glow(path, COLORS.line, width);
+    n.lineGlow(path, COLORS.line, width);
   }
 
   /** A line with no one on it, writing its word. */
@@ -614,12 +615,12 @@ function rowAt(n: Neon, y: number) {
 
 function drawRing(n: Neon, x: number, y: number, r: number, color: string, alpha: number) {
   if (n.retro) {
-    const [px, py] = n.toPixel(x, y), pr = Math.max(2, Math.round(r * n.dpr)), path = new Path2D();
+    const [px, py] = n.toPixel(x, y), pr = Math.max(2, Math.round(r * n.dpr)), path = new RenderPath();
     for (let a = 0; a < 96; a++) path.rect(Math.round(px + Math.cos((a / 48) * Math.PI) * pr), Math.round(py + Math.sin((a / 48) * Math.PI) * pr), 1, 1);
     n.fillPixels(path, color, alpha);
     return;
   }
-  const p = new Path2D();
+  const p = new RenderPath();
   p.arc(x, y, r, 0, Math.PI * 2);
   n.glow(p, color, 1.5, alpha);
 }

@@ -27,7 +27,7 @@ export function pixelTextWidth(s: string) {
 }
 
 /** Adds a string's pixels to a path, each one `scale` wide, with its top left corner at (x, y). */
-export function pixelText(path: Path2D, s: string, x: number, y: number, scale: number) {
+export function pixelText(path: Pick<Path2D, 'rect'>, s: string, x: number, y: number, scale: number) {
   for (const ch of s) {
     const rows = GLYPHS[ch.toUpperCase()];
     if (rows) {

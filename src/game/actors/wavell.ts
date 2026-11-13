@@ -9,6 +9,7 @@
 // were measured from the original sprites. Poses face right with y up, in original
 // pixels, origin between the feet on the line.
 
+import { RenderPath } from '../../core/renderPath';
 import type { Controls } from '../../core/input';
 import type { SpringLine } from '../line';
 import { COLORS, Neon, clamp, lerp, polyPath, smooth } from '../../core/neon';
@@ -699,7 +700,7 @@ export class Wavell {
     for (let i = 0; i < AURA_RIPPLES; i++) {
       const e = (t - i * AURA_GAP) / AURA_RIPPLE;
       if (e <= 0 || e >= 1) continue;
-      const k = 1 + AURA_REACH * (1 - (1 - e) * (1 - e)), echo = new Path2D();
+      const k = 1 + AURA_REACH * (1 - (1 - e) * (1 - e)), echo = new RenderPath();
       const copy = pts.map((v, j) => (j % 2 ? cy + (v - cy) * k : cx + (v - cx) * k));
       polyPath(copy, false, echo);
       neon.glow(echo, `hsl(${185 + 100 * e}, 100%, 72%)`, 0.32, (1 - e) * (1 - e) * 1.3 * fade);
@@ -707,8 +708,8 @@ export class Wavell {
     const lens = arcLengths(pts), len = lens[lens.length - 1];
     const run = len / 2 * ((t * AURA_RUNS) % 1);
     for (const from of [0, len]) {
-      const dir = from ? -1 : 1, tail = new Path2D(), head = new Path2D();
-      const trail = (path: Path2D, long: number) => {
+      const dir = from ? -1 : 1, tail = new RenderPath(), head = new RenderPath();
+      const trail = (path: RenderPath, long: number) => {
         const out: number[] = [];
         for (let i = 0; i <= 8; i++) out.push(...pointAt(pts, lens, from + dir * Math.max(0, run - (long * i) / 8)));
         polyPath(out, false, path);
@@ -743,7 +744,7 @@ export class Wavell {
     if ((this.state === 'appear' && this.cur[I.head + 1] < 1.5) || (this.sinking && this.eyesGone)) return;
     const tf = this.transform(line), H = this.headTf();
     const E = (lx: number, ly: number) => tf(...H(lx, ly));
-    const eyes = new Path2D();
+    const eyes = new RenderPath();
     // A slow blink now and then.
     const open = (this.time % 3.7) < 0.12 ? 0.15 : 1;
     const look = this.lookUp;
@@ -759,7 +760,7 @@ export class Wavell {
 
     if (this.dizzy > 0 && this.alive) {
       // Three little stars circling his head.
-      const stars = new Path2D(), amt = clamp(this.dizzy / 0.6, 0, 1);
+      const stars = new RenderPath(), amt = clamp(this.dizzy / 0.6, 0, 1);
       for (let i = 0; i < 3; i++) {
         const a = this.time * 5 + (i * Math.PI * 2) / 3;
         const [cx, cy] = E(Math.cos(a) * 7, 9.5 + Math.sin(a) * 1.8);
@@ -780,7 +781,7 @@ export class Wavell {
     if (!hot || !this.ember) return;
     const flick = 0.7 + Math.random() * 0.5;
     neon.glow(polyPath(hot), COLORS.danger, 1.3, flick);
-    const [ex, ey] = this.ember, core = new Path2D();
+    const [ex, ey] = this.ember, core = new RenderPath();
     core.arc(ex, ey, 0.9 + Math.random() * 0.5, 0, Math.PI * 2);
     neon.glow(core, '#ffffff', 1.2, 1.4);
   }
@@ -788,7 +789,7 @@ export class Wavell {
   /** Filling up (k, 0..1): his eyes spread apart and go wide, then screw shut as he gets tight, then settle into the bubble's. */
   private drawPuffEyes(neon: Neon, line: SpringLine, k: number) {
     const tf = this.transform(line), H = this.headTf(), sc = this.scale;
-    const spread = smooth(k / 0.5), eyes = new Path2D();
+    const spread = smooth(k / 0.5), eyes = new RenderPath();
     EYES.forEach((e, i) => {
       const end = BUBBLE_EYE_X * (i ? 1 : -1) / sc, ex = lerp(e, end, spread), ey = lerp(PUPIL_Y, BUBBLE_EYE_Y / sc, spread);
       const P = (dx: number, dy: number) => tf(...H(ex + dx, ey + dy));
@@ -822,9 +823,9 @@ export class Wavell {
     const r = this.bubbleR + Math.sin(this.time * 9) * 0.35 * settled;
     const x = this.x, y = this.by + Math.sin(this.time * 4) * 0.8 * settled;
     // Below the line the whole of it is mirrored, tied off towards the line, as he is.
-    const mirror = () => { if (this.side < 0) neon.ctx.transform(1, 0, 0, -1, 0, 2 * y); };
+    const mirror = () => { if (this.side < 0) neon.transform(1, -1, 2 * y); };
     mirror();
-    const ring = new Path2D();
+    const ring = new RenderPath();
     if (f > 0.82) {
       const dashes = 14;
       for (let i = 0; i < dashes; i++) {
@@ -850,10 +851,10 @@ export class Wavell {
     }
     const blinkOff = f > 0.9 && Math.floor(this.time * 12) % 2 === 0;
     neon.glow(ring, color, 0.85, blinkOff ? 0.4 : 1);
-    const shine = new Path2D();
+    const shine = new RenderPath();
     shine.arc(x, y, r * 0.72, -2.5, -1.9);
     neon.glow(shine, '#ffffff', 0.45, 0.6);
-    const eyes = new Path2D();
+    const eyes = new RenderPath();
     for (const ex of [-BUBBLE_EYE_X, BUBBLE_EYE_X]) {
       eyes.moveTo(x + ex - 0.9, y - BUBBLE_EYE_Y + (ex < 0 ? -0.5 : 0.4));
       eyes.lineTo(x + ex + 0.9, y - BUBBLE_EYE_Y + (ex < 0 ? 0.4 : -0.5));

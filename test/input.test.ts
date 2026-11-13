@@ -2,18 +2,20 @@
 
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { Input } from '../src/core/input';
+import { bindGameInputLayout, fitGameArea } from '../src/core/input-layout';
 import { VIEW_H, VIEW_W, fitArea } from '../src/core/neon';
+import type { Game } from '../src/game/game';
 
 const LEFT = { x: 100, y: 200 }, RIGHT = { x: 600, y: 200 };
 
-function touchScreen() {
+function touchScreen(width = 800, height = 400, top = 0) {
   const el = Object.assign(new EventTarget(), {
-    getBoundingClientRect: () => ({ left: 0, top: 0, width: 800, height: 400 }),
+    getBoundingClientRect: () => ({ left: 0, top, width, height }),
     setPointerCapture() {},
   }) as unknown as HTMLElement;
   const send = (type: string, id: number, x: number, y: number) =>
     el.dispatchEvent(Object.assign(new Event(type), { pointerId: id, pointerType: 'touch', clientX: x, clientY: y }));
-  return { input: new Input(el), send };
+  return { input: new Input(el), send, el };
 }
 
 beforeEach(() => { vi.stubGlobal('window', Object.assign(new EventTarget(), { innerWidth: 800, innerHeight: 400 })); });
@@ -249,5 +251,105 @@ describe('the play area', () => {
 
   it('fills a 16:9 screen exactly', () => {
     expect(fitArea(1920, 1080)).toEqual({ w: 1920, h: 1080, x: 0, y: 0 });
+  });
+
+  it('reserves the area below the fixed view for portrait play gestures', () => {
+    const inset = 45;
+    const { input, send } = touchScreen(390, 844, inset);
+    const area = fitGameArea(390, 844);
+    const cutoff = area.y + area.h + inset;
+    expect(area.w / area.h).toBeCloseTo(RATIO);
+    expect(area.y + area.h).toBeLessThan(300);
+    bindGameInputLayout({ mode: 'play', input, neon: { fullW: 390, fullH: 844, oy: area.y, h: area.h } } as unknown as Game);
+    send('pointerdown', 1, 85, cutoff - 1);
+    send('pointermove', 1, 115, cutoff - 1);
+    input.poll();
+    expect(input.controls().right).toBe(false);
+    send('pointerdown', 2, 85, cutoff + 1);
+    send('pointermove', 2, 115, cutoff + 1);
+    input.poll();
+    expect(input.controls().right).toBe(true);
+    send('pointerdown', 3, 340, cutoff + 1);
+    send('pointermove', 3, 340, cutoff + 31);
+    input.poll();
+    expect(input.controls()).toMatchObject({ right: true, dragPressed: true });
+  });
+});
+
+describe('input resets', () => {
+  it('cancels a touch edge and releases the movement stick', () => {
+    const { input, send } = touchScreen();
+    send('pointerdown', 1, LEFT.x, LEFT.y);
+    send('pointermove', 1, LEFT.x, LEFT.y + 40);
+    send('pointercancel', 1, LEFT.x, LEFT.y + 40);
+    input.poll();
+    expect(input.controls().down).toBe(false);
+    expect(input.controls().downPressed).toBe(false);
+  });
+
+  it('cancelling one touch keeps a different attack gesture', () => {
+    const { input, send } = touchScreen();
+    send('pointerdown', 1, RIGHT.x, RIGHT.y);
+    send('pointermove', 1, RIGHT.x + 30, RIGHT.y);
+    send('pointerdown', 2, RIGHT.x, RIGHT.y);
+    send('pointermove', 2, RIGHT.x, RIGHT.y + 30);
+    send('pointercancel', 2, RIGHT.x, RIGHT.y + 30);
+    input.poll();
+    expect(input.controls()).toMatchObject({ dragPressed: false, pullPressed: true });
+  });
+
+  it('clears held input on blur and waits for a gamepad to return to neutral', () => {
+    const { input, send } = touchScreen();
+    const pad = { index: 0, connected: true, buttons: [], axes: [1, 0] };
+    vi.stubGlobal('navigator', { getGamepads: () => [pad] });
+    send('pointerdown', 1, LEFT.x, LEFT.y);
+    send('pointermove', 1, LEFT.x - 30, LEFT.y);
+    input.poll();
+    expect(input.controls()).toMatchObject({ left: true, right: true });
+    window.dispatchEvent(new Event('blur'));
+    input.poll();
+    expect(input.controls()).toMatchObject({ left: false, right: false });
+    window.dispatchEvent(new Event('focus'));
+    input.poll();
+    expect(input.controls().right).toBe(false);
+    pad.axes[0] = 0;
+    input.poll();
+    pad.axes[0] = 1;
+    input.poll();
+    expect(input.controls().right).toBe(true);
+    pad.connected = false;
+    input.poll();
+    expect(input.controls().right).toBe(false);
+    pad.connected = true;
+    pad.axes = [0, -1];
+    input.poll();
+    expect(input.controls()).toMatchObject({ right: false, up: true, upPressed: true });
+    input.poll();
+    expect(input.controls().upPressed).toBe(false);
+  });
+
+  it('keeps a direction held when one of two bound keys is released', () => {
+    const { input } = touchScreen();
+    const key = (type: string, code: string) => window.dispatchEvent(Object.assign(new Event(type), { code, repeat: false }));
+    key('keydown', 'ArrowRight');
+    key('keydown', 'KeyD');
+    key('keyup', 'ArrowRight');
+    input.poll();
+    expect(input.controls().right).toBe(true);
+    key('keyup', 'KeyD');
+    input.poll();
+    expect(input.controls().right).toBe(false);
+  });
+
+  it('receives a renderer pointer start and still owns native capture through release', () => {
+    const { input, el, send } = touchScreen();
+    const run = vi.fn();
+    input.setSurface(el, { pointerDown: 'pixi' });
+    send('pointerdown', 1, RIGHT.x, RIGHT.y);
+    input.poll();
+    expect(input.anyPressed).toBe(false);
+    input.pointerDown({ pointerId: 1, pointerType: 'touch', clientX: RIGHT.x, clientY: RIGHT.y, preventDefault() {} }, run);
+    send('pointerup', 1, RIGHT.x, RIGHT.y);
+    expect(run).toHaveBeenCalledOnce();
   });
 });

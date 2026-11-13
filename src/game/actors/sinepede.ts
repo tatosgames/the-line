@@ -10,6 +10,7 @@
 // All of it is one stroke of the line: its spikes rise out of the curve and come back
 // down to it, and its free ends ease out of the flat line without a corner.
 
+import { RenderPath } from '../../core/renderPath';
 import type { Part, Shape } from '../crumble';
 import type { SpringLine } from '../line';
 import { DIFF } from '../../data/difficulty';
@@ -221,14 +222,8 @@ export class Sinepede {
     const at = this.eye(line, [Math.min(SKIRT, Math.max(0, skirts[0])), Math.min(SKIRT, Math.max(0, skirts[1]))]);
     if (!at) return;
     // The line stops at the ring and carries on after it.
-    const c = neon.ctx;
-    c.globalCompositeOperation = 'source-over';
-    c.globalAlpha = 1;
-    c.fillStyle = '#020107';
-    c.beginPath();
-    c.arc(at[0], at[1], EYE_R, 0, Math.PI * 2);
-    c.fill();
-    const ring = new Path2D();
+    neon.fillCircle(at[0], at[1], EYE_R, '#020107');
+    const ring = new RenderPath();
     ring.arc(at[0], at[1], EYE_R, 0, Math.PI * 2);
     neon.glow(ring, COLORS.eye, 0.7, this.intensity);
     neon.glow(ring, '#ffd9d2', 0.25, this.intensity);

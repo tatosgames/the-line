@@ -2,6 +2,7 @@
 // comes in from one edge of the screen and leaves by the other. It is the line again,
 // so it wiggles slowly.
 
+import { RenderPath } from '../core/renderPath';
 import { Neon, clamp, lerp, polyPath, rand, smooth } from '../core/neon';
 import { Fx } from './fx';
 
@@ -200,35 +201,14 @@ function wordPoints(n: Neon, w: Word, time: number): number[] {
 
 /** The haze behind a word. */
 function drawHaze(n: Neon, w: Word, tint: Tint, alpha: number) {
-  const { k, oy } = place(n, w), c = n.ctx, rgb = tint.haze.map(Math.round).join(',');
+  const { k, oy } = place(n, w);
   const rx = ((w.right - w.left) * k) / 2 + 60 * k;
-  c.globalCompositeOperation = 'lighter';
-  c.save();
-  c.translate(n.w / 2, oy - 50 * k);
-  c.scale(1, (95 * k) / rx);
-  const haze = c.createRadialGradient(0, 0, 0, 0, 0, rx);
-  haze.addColorStop(0, `rgba(${rgb},${HAZE * alpha})`);
-  haze.addColorStop(0.7, `rgba(${rgb},${HAZE * 0.6 * alpha})`);
-  haze.addColorStop(1, `rgba(${rgb},0)`);
-  c.fillStyle = haze;
-  c.fillRect(-rx, -rx, rx * 2, rx * 2);
-  c.restore();
+  n.haze(n.w / 2, oy - 50 * k, rx, 95 * k, tint.haze.map(Math.round), HAZE * alpha);
 }
 
 /** The stroke itself, with a soft bloom that follows it. */
-function drawStroke(n: Neon, path: Path2D, tint: Tint, width: number) {
-  const c = n.ctx, color = css(tint.stroke);
-  c.globalCompositeOperation = 'lighter';
-  c.shadowColor = color;
-  c.shadowBlur = width * BLOOM * n.dpr;
-  c.strokeStyle = color;
-  c.lineCap = c.lineJoin = 'round';
-  c.lineWidth = width;
-  c.globalAlpha = 0.55;
-  c.stroke(path);
-  c.shadowBlur = 0;
-  c.globalAlpha = 1;
-  n.glow(path, color, width);
+function drawStroke(n: Neon, path: RenderPath, tint: Tint, width: number) {
+  n.titleGlow(path, css(tint.stroke), width, BLOOM);
 }
 
 const strokeWidth = (k: number) => clamp(LINE_WIDTH * k, 1.5, 7);
@@ -321,11 +301,11 @@ export class TitleDust {
       drawStroke(n, polyPath(rest), TITLE_TINT, width);
       // The stroke runs hot just ahead of the break, and the break itself is white-hot.
       n.glow(polyPath(rest.slice(0, 16)), '#fff1b0', width * 1.3, 0.7 + rand(0, 0.5));
-      const core = new Path2D();
+      const core = new RenderPath();
       core.arc(rest[0], rest[1], width * 0.9, 0, Math.PI * 2);
       n.glow(core, '#ffffff', width, 1.4);
     }
-    n.ctx.scale(n.unit, n.unit);
+    n.transform(n.unit, n.unit);
     this.fx.draw(n);
     n.screen();
   }

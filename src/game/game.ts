@@ -94,6 +94,7 @@ const NOSTALGIA_STORE = 'the-line-nostalgia';
 const SPRAY = 48;
 const AIR_SPRAY = 28;
 const NO_INPUT: Controls = { left: false, right: false, up: false, down: false, upPressed: false, downPressed: false, dragPressed: false, pullPressed: false };
+const PRESS_ACTIONS = ['upPressed', 'downPressed', 'dragPressed', 'pullPressed'] as const;
 
 /** A reflux at half his height from the line (or dist u from it), on the given side (1: above it). */
 export function reflux(sx: number, dir: 1 | -1, side: 1 | -1, W: Wavell, warn = 0, dist = W.height / 2): Reflux {
@@ -147,6 +148,8 @@ export class Game {
   best = 0;
   endX = -1000;
   private acc = 0;
+  private pendingPresses = { ...NO_INPUT };
+  private inputEpoch = 0;
   time = 0;
   playTime = 0;
   private sineClock = 0;
@@ -192,7 +195,7 @@ export class Game {
   installNote = -1;
   stars = Array.from({ length: 90 }, () => ({ x: Math.random(), y: Math.random(), z: rand(0.04, 0.3), s: rand(0.6, 1.8), p: rand(0, 6) }));
 
-  constructor(readonly neon: Neon, readonly input: Input) {
+  constructor(public neon: Neon, readonly input: Input) {
     try { this.best = Number(localStorage.getItem(STORE)) || 0; } catch { /* storage blocked */ }
     input.onKey.set('KeyM', () => sfx.toggleMute());
     input.onKey.set('Escape', () => { this.menuAsked = true; });
@@ -251,6 +254,7 @@ export class Game {
   }
 
   start() {
+    this.clearGameplayPresses();
     sfx.unlock();
     // On the title he has already risen out of the line, or is doing it now.
     if (this.mode === 'title' && this.wavell.alive) this.wavell.hurry();
@@ -307,6 +311,7 @@ export class Game {
    * rises again once the line is clear. `morph`: FLATLINED turns into the title first.
    */
   backToTitle(morph: boolean) {
+    this.clearGameplayPresses();
     const W = this.wavell;
     this.setPaused(false);
     this.keepBest();
@@ -379,6 +384,7 @@ export class Game {
   setPaused(on: boolean) {
     if (on === this.paused) return;
     this.paused = on;
+    this.clearGameplayPresses();
     sfx.pause(on);
   }
 
@@ -395,9 +401,17 @@ export class Game {
   tick(k: Controls) { this.step(STEP, k); }
   draw(dt: number) { drawGame(this, dt); }
 
-  frame(dt: number) {
+  private clearGameplayPresses() {
+    for (const action of PRESS_ACTIONS) this.pendingPresses[action] = false;
+  }
+
+  frame(dt: number, draw = (game: Game, elapsed: number) => game.draw(elapsed)) {
     dt = clamp(dt, 0, 0.05);
     this.input.poll();
+    if (this.inputEpoch !== this.input.resetEpoch) {
+      this.inputEpoch = this.input.resetEpoch;
+      this.clearGameplayPresses();
+    }
     const ready = this.mode === 'over' && this.overT > 0.8;
     if (this.audio.open) {
       if (this.menuAsked || this.input.backPressed) this.closeAudio();
@@ -410,19 +424,27 @@ export class Game {
       else this.menu.handle(this.input);
     }
     this.menuAsked = false;
-    if (this.paused) { drawGame(this, dt); return; }
+    if (this.paused) { draw(this, dt); return; }
     this.titleDust?.update(dt, this.neon, this.time);
     if (this.titleDust?.done) this.titleDust = null;
-    let controls: Controls = this.mode === 'play' ? { ...this.input } : NO_INPUT;
+    const playing = this.mode === 'play';
+    const controls: Controls = playing ? this.input.controls() : NO_INPUT;
+    if (playing) {
+      for (const action of PRESS_ACTIONS) {
+        this.pendingPresses[action] ||= controls[action];
+        controls[action] = this.pendingPresses[action];
+      }
+    } else this.clearGameplayPresses();
     // The world keeps the beat's tempo, on the start screen too once its music plays.
     this.acc += dt * (DIFF.beatOn && (this.mode !== 'title' || this.titleMusic) ? this.beat.speed : 1);
     while (this.acc >= STEP) {
       this.step(STEP, controls);
-      controls = { ...controls, upPressed: false, downPressed: false, dragPressed: false, pullPressed: false };
+      this.clearGameplayPresses();
+      if (playing) for (const action of PRESS_ACTIONS) controls[action] = false;
       this.acc -= STEP;
     }
     this.hum();
-    drawGame(this, dt);
+    draw(this, dt);
   }
 
   /** The nearest Sinepede is heard as well as seen: its pure tone swells as it gets close. */

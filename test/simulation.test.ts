@@ -23,6 +23,26 @@ vi.mock('../src/core/sfx', () => ({ sfx: { pause() {}, unlock() {}, play() {}, t
 const SECONDS = 120;
 const STEPS_PER_SECOND = 120;
 
+it('delivers a short attack press on the next fixed step exactly once', () => {
+  const g = headlessGame();
+  g.quiet = true;
+  g.start();
+  let pressed = true;
+  g.input.controls = () => ({ ...IDLE, dragPressed: pressed });
+  const edges: boolean[] = [];
+  const update = g.wavell.update.bind(g.wavell);
+  vi.spyOn(g.wavell, 'update').mockImplementation((...args) => {
+    edges.push(args[1].dragPressed);
+    return update(...args);
+  });
+  const draw = () => {};
+  g.frame(1 / 480, draw);
+  expect(edges).toHaveLength(0);
+  pressed = false;
+  g.frame(1 / 30, draw);
+  expect(edges.filter(Boolean)).toHaveLength(1);
+});
+
 /** Runs a scripted game and returns what it went through. Extra lives keep a clumsy player in for the later enemies. */
 function play(seed: number, startLives?: number) {
   Math.random = seeded(seed);

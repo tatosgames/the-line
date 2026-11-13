@@ -1,10 +1,10 @@
 // Everything drawn over the world in screen space: score, lives, the lead gauge,
 // title and game over screens, the on-screen buttons and the touch controls.
 
-import { canFullscreen, canInstall, isFullscreen } from '../core/app';
+import { RenderPath } from '../core/renderPath';
+import { canInstall } from '../core/app';
 import { keyLabel } from '../core/controls';
 import { COLORS, Neon, clamp } from '../core/neon';
-import { sfx } from '../core/sfx';
 import { DIFF } from '../data/difficulty';
 import type { Game } from './game';
 import { MORPH_TIME, drawFlatlined, drawMorph, drawTitle } from './title';
@@ -12,23 +12,13 @@ import { MORPH_TIME, drawFlatlined, drawMorph, drawTitle } from './title';
 /** The HUD's base size: a share of the play area, so it lays out the same on every screen. */
 export const hudSize = (n: Neon) => n.h * 0.045;
 
-/**
- * In HUD sizes: how far down the buttons sit, how far apart they are, and how far from the
- * right the score ends to leave the top row room. Fullscreen has a row of its own under it,
- * so the top row is the same with it or without it (an installed app has none).
- */
-const BUTTON_Y = 1.1, BUTTON_GAP = 2.2, SCORE_RIGHT = 5;
+const BUTTON_Y = 1.1, SCORE_RIGHT = 2.9;
 
 /** Nostalgia mode's pictures of the HUD, drawn pixel by pixel. */
 const RETRO = {
-  speaker: ['...#.....', '..##..#..', '####...#.', '####...#.', '####...#.', '..##..#..', '...#.....'],
-  muted: ['...#.....', '..##.....', '####.#.#.', '####..#..', '####.#.#.', '..##.....', '...#.....'],
-  fullscreen: ['###...###', '#.......#', '#.......#', '.........', '.........', '.........', '#.......#', '#.......#', '###...###'],
-  windowed: ['..#...#..', '..#...#..', '###...###', '.........', '.........', '.........', '###...###', '..#...#..', '..#...#..'],
-  checks: ['###...###', '###...###', '###...###', '...###...', '...###...', '...###...', '###...###', '###...###', '###...###'],
+  settings: ['.#.#.#.', '#######', '.#.#.#.', '.#.#.#.', '.#.#.#.', '#######', '.#.#.#.'],
   ring: ['..#####..', '.#.....#.', '#.......#', '#.......#', '#.......#', '#.......#', '#.......#', '.#.....#.', '..#####..'],
   face: ['..#####..', '.#.....#.', '#.#...#.#', '#..#.#..#', '#.......#', '#.......#', '#.......#', '.#.....#.', '..#####..'],
-  beat: ['.#.', '###', '.#.'],
 } as const;
 
 /** One of those pictures, centred on a point given in the coordinates screen() draws in. */
@@ -84,59 +74,34 @@ export function devLinkAt(n: Neon, x: number, y: number): string | null {
 }
 
 function drawDevMenu(g: Game) {
-  const n = g.neon, b = devBox(n), c = n.ctx, tx = b.x + b.s * 0.45;
+  const n = g.neon, b = devBox(n), tx = b.x + b.s * 0.45;
   n.screen();
-  const box = new Path2D();
+  const box = new RenderPath();
   box.rect(b.x, b.y, b.w, b.h);
   if (n.retro) n.pixelFrame(b.x, b.y, b.w, b.h, '#c9a640', 0.6);
   else n.glow(box, '#c9a640', 1, 0.35);
   n.text('DEV', tx, b.y + b.row * 0.65, b.s * 0.42, '#c9a640', 'left', 0.75);
   const hover = devLinkAt(n, g.input.mouseX - n.ox, g.input.mouseY - n.oy);
   DEV_LINKS.forEach((l, i) => n.text(l.label, tx, b.y + b.row * (1.65 + i), b.s * 0.5, hover === l.url ? COLORS.hud : '#c9a640', 'left', hover === l.url ? 1 : 0.8));
-  c.canvas.style.cursor = hover ? 'pointer' : '';
+  n.cursor(hover ? 'pointer' : '');
 }
 
-/**
- * The audio button on screen: [x, y, radius]. It opens the audio menu. Up by the score
- * rather than at the bottom, where the right thumb swipes.
- */
-export function audioButton(n: Neon): [number, number, number] {
-  const s = hudSize(n);
-  return [n.w - s * 1.4, BUTTON_Y * s, s * 0.9];
+/** Top-right settings button, with a larger hit target than its icon. */
+export function settingsButton(n: Neon): [number, number, number] {
+  const s = hudSize(n), radius = Math.max(22, s * 0.9);
+  return [n.w - Math.max(radius, s * 1.4), Math.max(radius, BUTTON_Y * s), radius];
 }
 
-/** The fullscreen button on screen, under the audio button. */
-export function fullscreenButton(n: Neon): [number, number, number] {
-  const s = hudSize(n);
-  return [n.w - s * 1.4, (BUTTON_Y + BUTTON_GAP) * s, s * 0.9];
-}
-
-/** The nostalgia button on screen, beside the audio button. */
-export function nostalgiaButton(n: Neon): [number, number, number] {
-  const s = hudSize(n);
-  return [n.w - s * (1.4 + BUTTON_GAP), BUTTON_Y * s, s * 0.9];
-}
-
-/** A checkerboard of big pixels: lit up when nostalgia mode is on. */
-function drawNostalgia(n: Neon) {
-  const [x, y, r] = nostalgiaButton(n), p = new Path2D(), a = r * 0.36;
-  if (n.retro) { retroSprite(n, RETRO.checks, x, y, COLORS.hud); return; }
-  for (let i = -1; i <= 1; i++) for (let j = -1; j <= 1; j++) if ((i + j) % 2 === 0) p.rect(x + (i - 0.5) * a, y + (j - 0.5) * a, a, a);
-  n.glow(p, n.retro ? COLORS.hud : '#c9a640', 1.4, n.retro ? 1 : 0.7);
-}
-
-function drawFullscreen(n: Neon) {
-  const [x, y, r] = fullscreenButton(n), p = new Path2D(), a = r * 0.6, b = r * 0.25;
-  if (n.retro) { retroSprite(n, isFullscreen() ? RETRO.windowed : RETRO.fullscreen, x, y, '#c9a640', 0.8); return; }
-  // Four corners, pointing out to go fullscreen and in to come back.
-  const out = isFullscreen() ? -1 : 1;
-  for (const [i, j] of [[-1, -1], [1, -1], [1, 1], [-1, 1]]) {
-    const cx = x + i * (out > 0 ? a : b), cy = y + j * (out > 0 ? a : b), d = (a - b) * out;
-    p.moveTo(cx - i * d, cy);
-    p.lineTo(cx, cy);
-    p.lineTo(cx, cy - j * d);
+function drawSettings(n: Neon) {
+  const [x, y] = settingsButton(n), s = hudSize(n);
+  if (n.retro) { retroSprite(n, RETRO.settings, x, y, '#c9a640', 0.9); return; }
+  const path = new RenderPath();
+  for (const [dx, notch] of [[-0.33, -0.18], [0, 0.18], [0.33, -0.03]]) {
+    const px = x + s * dx, py = y + s * notch;
+    path.moveTo(px, y - s * 0.42); path.lineTo(px, y + s * 0.42);
+    path.moveTo(px - s * 0.11, py); path.lineTo(px + s * 0.11, py);
   }
-  n.glow(p, '#c9a640', 1.4, 0.7);
+  n.glow(path, '#c9a640', 1.4, 0.85);
 }
 
 /** Which build this is, small, down in the right corner of the start screen. */
@@ -162,19 +127,19 @@ export function inInstallButton(n: Neon, x: number, y: number) {
 function drawInstall(g: Game) {
   const n = g.neon, b = installBox(n);
   const hover = inInstallButton(n, g.input.mouseX - n.ox, g.input.mouseY - n.oy);
-  const box = new Path2D();
+  const box = new RenderPath();
   box.rect(b.x, b.y, b.w, b.h);
   if (n.retro) n.pixelFrame(b.x, b.y, b.w, b.h, '#c9a640', hover ? 1 : 0.6);
   else n.glow(box, '#c9a640', 1, hover ? 0.7 : 0.35);
   n.screen();
   n.text('install app', b.x + b.w / 2, b.y + b.h / 2, b.s * 0.5, hover ? COLORS.hud : '#c9a640', 'center', hover ? 1 : 0.8);
-  if (hover) n.ctx.canvas.style.cursor = 'pointer';
+  if (hover) n.cursor('pointer');
   if (g.time < g.installNote) n.text('Share menu, then Add to Home Screen', b.x + b.w, b.y - b.s * 0.6, b.s * 0.5, COLORS.hud, 'right');
 }
 
 /** A chevron at (x, y), pointing the way (dx, dy) says. */
 export function chevron(n: Neon, x: number, y: number, dx: number, dy: number, size: number, color: string, alpha: number) {
-  const p = new Path2D();
+  const p = new RenderPath();
   p.moveTo(x - dx * size * 0.5 - dy * size, y - dy * size * 0.5 - dx * size);
   p.lineTo(x + dx * size * 0.5, y + dy * size * 0.5);
   p.lineTo(x - dx * size * 0.5 + dy * size, y - dy * size * 0.5 + dx * size);
@@ -186,22 +151,25 @@ function drawTouch(g: Game) {
   const n = g.neon, inp = g.input;
   n.overlay();
   const r = Math.min(n.fullW, n.fullH) * 0.11, gap = r * 1.2, size = r * 0.26;
+  const portraitTop = inp.gestureTop?.() ?? 0;
+  const leftY = portraitTop ? Math.max(portraitTop + r * 1.6, n.fullH - r * 2) : n.fullH - r * 1.6;
+  const rightY = portraitTop ? leftY : n.fullH - r * 1.7;
   // Left thumb: a stick that walks, floats and goes through the line.
   const st = inp.stick;
-  const ox = st ? st.ox : r * 1.6, oy = st ? st.oy : n.fullH - r * 1.6;
-  const base = new Path2D();
+  const ox = st ? st.ox : r * 1.6, oy = st ? st.oy : leftY;
+  const base = new RenderPath();
   base.arc(ox, oy, r, 0, Math.PI * 2);
   n.glow(base, '#c9a640', 1.5, st ? 0.6 : 0.3);
   const kx = st ? clamp(st.x - ox, -r, r) + ox : ox, ky = st ? clamp(st.y - oy, -r, r) + oy : oy;
-  const knob = new Path2D();
+  const knob = new RenderPath();
   knob.arc(kx, ky, r * 0.38, 0, Math.PI * 2);
   n.glow(knob, COLORS.hud, 1.5, st ? 0.9 : 0.35);
   for (const d of [-1, 1]) chevron(n, ox, oy + d * gap, 0, d, size, '#c9a640', 0.3 + (Math.sign(inp.stickFlash) === d ? Math.abs(inp.stickFlash) * 0.7 : 0));
   inp.stickFlash *= 0.9;
   // Right thumb: the swipes. They follow the thumb.
   const sw = inp.swipe;
-  const ax = sw ? sw.ox : n.fullW - r * 1.8, ay = sw ? sw.oy : n.fullH - r * 1.7;
-  const dot = new Path2D();
+  const ax = sw ? sw.ox : n.fullW - r * 1.8, ay = sw ? sw.oy : rightY;
+  const dot = new RenderPath();
   dot.arc(ax, ay, r * 0.3, 0, Math.PI * 2);
   n.glow(dot, COLORS.hud, 1.5, sw ? 0.7 : 0.3);
   for (const d of [-1, 1]) {
@@ -218,74 +186,57 @@ function drawSurround(g: Game) {
   n.overlay();
   if ((n.ox > 0 || n.oy > 0) && n.retro) n.pixelFrame(0, 0, n.w, n.h, '#5a4a20', 0.8);
   else if (n.ox > 0 || n.oy > 0) {
-    const p = new Path2D();
+    const p = new RenderPath();
     p.rect(n.ox, n.oy, n.w, n.h);
     n.glow(p, '#5a4a20', 0.8, 0.5);
   }
-  if (n.fullH > n.fullW) n.text('turn the phone for a bigger view', n.w / 2, -n.oy / 2, Math.max(13, n.unit * 8), '#c9a640', 'center', 0.8);
+  if (n.fullH > n.fullW && !g.input.gestureTop) n.text('turn the phone for a bigger view', n.w / 2, -n.oy / 2, Math.max(13, n.unit * 8), '#c9a640', 'center', 0.8);
 }
 
 /** The beats of the bar, as dots ending at x, with the current one lit. */
-function drawBar(g: Game, x: number, y: number, s: number) {
-  const beats = g.beat.beats, gap = s * Math.min(0.6, 2.4 / beats);
-  for (let i = 0; i < beats; i++) {
-    const p = new Path2D(), r = s * 0.13, cx = x - (beats - 1 - i) * gap - r;
-    if (g.neon.retro) { retroSprite(g.neon, RETRO.beat, cx, y, COLORS.hud, i === g.beat.beatOfBar ? 1 : 0.3); continue; }
-    p.arc(cx, y, r, 0, Math.PI * 2);
-    g.neon.glow(p, COLORS.hud, 1.2, i === g.beat.beatOfBar ? 1.4 : 0.25);
-  }
-}
-
 /** How much line is left behind Wavell before the break: the time you have. */
 function drawLead(g: Game, x: number, y: number, s: number) {
   const n = g.neon, W = g.wavell;
   const lead = clamp((W.x - g.endX) / DIFF.endLead, 0, 1);
   const w = s * 6.5;
   const color = lead > 0.5 ? COLORS.hud : lead > 0.25 ? COLORS.danger : '#ff3b30';
-  if (lead < 0.25 && Math.floor(g.time * 6) % 2 === 0 && g.mode === 'play') return;
   if (n.retro) {
     const [x0, py] = n.toPixel(x, y), [x1] = n.toPixel(x + w, y), lit = Math.round(x1 - (x1 - x0) * lead);
-    const empty = new Path2D(), full = new Path2D(), frayed = new Path2D();
+    const empty = new RenderPath(), full = new RenderPath(), frayed = new RenderPath();
     empty.rect(x0, py, x1 - x0, 1);
-    full.rect(lit, py - 1, x1 - lit, 3);
+    full.rect(lit, py - 1, Math.max(1, x1 - lit), 3);
     // A little frayed end at the left of the bar.
     frayed.rect(lit - 2, py - 1, 1, 1);
     frayed.rect(lit - 4, py + 1, 1, 1);
-    n.fillPixels(empty, '#5a4a20', 0.8);
+    n.fillPixels(empty, '#79653d', 0.9);
     n.fillPixels(full, color);
     n.fillPixels(frayed, color, 0.8);
     return;
   }
-  const back = new Path2D();
+  const back = new RenderPath();
   back.moveTo(x, y); back.lineTo(x + w, y);
-  n.glow(back, '#5a4a20', 1.2, 0.6);
-  const bar = new Path2D();
-  bar.moveTo(x + w * (1 - lead), y); bar.lineTo(x + w, y);
-  n.glow(bar, color, 2, 1);
+  n.glow(back, '#79653d', 1.4, 0.75);
+  const bar = new RenderPath();
+  bar.moveTo(x + w - Math.max(1, w * lead), y); bar.lineTo(x + w, y);
+  n.glow(bar, color, lead <= 0.25 ? 3.5 : 2.5, 1);
   // A little frayed end at the left of the bar.
-  const fr = new Path2D();
+  const fr = new RenderPath();
   const fx = x + w * (1 - lead);
   for (const o of [-3, -6]) { fr.moveTo(fx + o, y - 1); fr.lineTo(fx + o + 1.5, y + 1); }
   n.glow(fr, color, 1.2, 0.8);
 }
 
-/**
- * The size counter: a circle for each size he can reach. A whole one, with a face, is a
- * hit he can take; the next one draws itself round, a slice for each sparkle caught.
- */
-/** The boss's name, and a circle for each size he has left. */
+/** The boss's remaining hits, centred at the top of the play area. */
 function drawBoss(g: Game, cx: number, y: number, s: number) {
-  const n = g.neon, B = g.boss!;
-  n.text('THE FLATTENER', cx - s * 0.4, y, s * 0.55, COLORS.danger, 'right');
-  n.world();
-  const wx = n.camX + (cx + s * 0.4) / n.unit + 3, wy = n.viewTop + y / n.unit;
+  const n = g.neon, hp = g.boss!.hp;
   for (let i = 0; i < DIFF.bossHits; i++) {
-    const p = new Path2D(), x = wx + i * 9, left = i < B.hp;
-    p.arc(x, wy, 3, 0, Math.PI * 2);
-    if (left) { p.moveTo(x + 1.2, wy); p.arc(x, wy, 1.2, 0, Math.PI * 2); }
-    n.glow(p, COLORS.danger, 0.5, left ? 1 : 0.25);
+    const x = cx + (i - (DIFF.bossHits - 1) / 2) * s * 0.85, left = i < hp;
+    if (n.retro) { retroSprite(n, RETRO.ring, x, y, COLORS.danger, left ? 1 : 0.3); continue; }
+    const p = new RenderPath();
+    p.arc(x, y, s * 0.28, 0, Math.PI * 2);
+    if (left) { p.moveTo(x + s * 0.10, y); p.arc(x, y, s * 0.10, 0, Math.PI * 2); }
+    n.glow(p, COLORS.danger, 1.5, left ? 1 : 0.3);
   }
-  n.screen();
 }
 
 function drawSizes(g: Game, x: number, y: number) {
@@ -302,17 +253,17 @@ function drawSizes(g: Game, x: number, y: number) {
   }
   for (let i = 0; i < DIFF.growMax; i++) {
     const cx = x + i * 11, whole = i < W.size;
-    const ring = new Path2D();
+    const ring = new RenderPath();
     ring.arc(cx, y, 4, 0, Math.PI * 2);
     n.glow(ring, COLORS.wavell, 0.4, whole ? 0 : 0.22);
     if (whole) {
-      const p = new Path2D();
+      const p = new RenderPath();
       p.arc(cx, y, 4, 0, Math.PI * 2);
       p.moveTo(cx - 2.2, y - 1.4); p.lineTo(cx - 0.8, y - 0.8);
       p.moveTo(cx + 2.2, y - 1.4); p.lineTo(cx + 0.8, y - 0.8);
       n.glow(p, COLORS.wavell, 0.6);
     } else if (i === W.size && W.sparks > 0) {
-      const p = new Path2D();
+      const p = new RenderPath();
       p.arc(cx, y, 4, top, top + Math.PI * 2 * W.sparks / DIFF.sparksPerSize);
       n.glow(p, COLORS.wavell, 0.6);
     }
@@ -320,14 +271,14 @@ function drawSizes(g: Game, x: number, y: number) {
 }
 
 export function drawHud(g: Game) {
-  const n = g.neon, c = n.ctx, inp = g.input;
+  const n = g.neon, inp = g.input;
   const s = hudSize(n), pad = s * 0.9;
   const cx = n.w / 2, hudFade = g.titleDust?.hudFade ?? 1;
   if (g.mode === 'title' && g.morphT < MORPH_TIME) drawMorph(n, g.morphT, g.time);
   else if (g.mode === 'title') {
     drawTitle(n, g.time);
     g.menu.drawHud();
-    c.canvas.style.cursor = '';
+    n.cursor('');
     if (g.menu.page === 'main') {
       const inHint = g.time % HINT_TIME;
       const hintAlpha = clamp(Math.min(inHint, HINT_TIME - inHint) / HINT_FADE, 0, 1);
@@ -337,21 +288,20 @@ export function drawHud(g: Game) {
       drawVersion(n);
     }
   } else {
-    c.canvas.style.cursor = '';
+    n.cursor('');
     g.titleDust?.draw(n);
     n.fade = hudFade;
-    const score = String(g.score).padStart(6, '0');
-    n.text(score, n.w - s * SCORE_RIGHT, pad, s, COLORS.hud, 'right');
-    // Bigger, he scores more: the multiplier sits to the left of the score.
-    if (g.multiplier > 1) n.text('×' + g.multiplier, n.w - s * SCORE_RIGHT - n.wordWidth(score, s) - s * 0.5, pad, s * 0.8, '#ffe680', 'right');
-    n.text(g.levelLabel + (DIFF.beatOn ? `  ·  ${Math.round(g.beat.bpm)} BPM` : ''), cx, pad, s * 0.7, '#ffb21a');
-    if (g.boss) drawBoss(g, cx, pad + s * 1.15, s);
-    if (DIFF.beatOn) drawBar(g, n.w - s * SCORE_RIGHT, pad + s * 1.1, s);
-    n.world();
-    drawSizes(g, n.camX + (pad / n.unit) + 4, n.viewTop + pad / n.unit + 1);
-    n.screen();
-    if (g.mode !== 'over') drawLead(g, pad, pad + s * 1.4, s);
-    if (g.banner > 0) n.text(g.bannerText || g.levelLabel, cx, n.lineY - n.unit * 70, s * 2.4, COLORS.hud, 'center', Math.min(1, g.banner));
+    if (g.mode === 'play') {
+      const score = g.multiplier > 1 ? `×${g.multiplier}  ${g.score}` : String(g.score);
+      const [buttonX, buttonY, buttonRadius] = settingsButton(n);
+      n.text(score, Math.min(n.w - s * SCORE_RIGHT, buttonX - buttonRadius - s * 0.25), buttonY, s * 0.68, COLORS.hud, 'right', 0.78);
+      if (g.boss) drawBoss(g, cx, pad, s);
+      n.world();
+      drawSizes(g, n.camX + (pad / n.unit) + 4, n.viewTop + pad / n.unit + 1);
+      n.screen();
+      drawLead(g, pad, pad + s * 1.4, s);
+    }
+    if (g.banner > 0) n.text(g.bannerText || g.levelLabel, cx, n.lineY - n.unit * 70, s * 1.65, COLORS.hud, 'center', Math.min(1, g.banner));
     if (g.hintT > 0 && g.mode === 'play') n.text(g.hint, cx, pad + s * 2.4, s * 0.62, '#ffd77a', 'center', Math.min(1, g.hintT));
     if (g.paused && !g.audio.open) {
       n.text('PAUSED', cx, n.lineY - n.unit * 75, s * 2.4, COLORS.hud);
@@ -364,23 +314,11 @@ export function drawHud(g: Game) {
     }
   }
   n.fade = 1;
-  // The buttons, the same in every mode.
   n.screen();
-  const [bx, by, br] = audioButton(n);
-  if (n.retro) retroSprite(n, sfx.muted ? RETRO.muted : RETRO.speaker, bx, by, '#c9a640', 0.8);
-  const m = new Path2D();
-  m.moveTo(bx - br * 0.5, by - br * 0.2); m.lineTo(bx - br * 0.2, by - br * 0.2); m.lineTo(bx + br * 0.15, by - br * 0.5);
-  m.lineTo(bx + br * 0.15, by + br * 0.5); m.lineTo(bx - br * 0.2, by + br * 0.2); m.lineTo(bx - br * 0.5, by + br * 0.2); m.closePath();
-  if (sfx.muted) { m.moveTo(bx + br * 0.35, by - br * 0.25); m.lineTo(bx + br * 0.75, by + br * 0.25); m.moveTo(bx + br * 0.75, by - br * 0.25); m.lineTo(bx + br * 0.35, by + br * 0.25); }
-  else { m.moveTo(bx + br * 0.4, by - br * 0.3); m.quadraticCurveTo(bx + br * 0.65, by, bx + br * 0.4, by + br * 0.3); }
-  if (!n.retro) n.glow(m, '#c9a640', 1.4, 0.7);
-
-  if (canFullscreen()) drawFullscreen(n);
-  drawNostalgia(n);
+  if (!g.audio.open) drawSettings(n);
   drawSurround(g);
   n.fade = hudFade;
   if (g.mode === 'play' && !g.audio.open && (inp.touchUsed || matchMedia('(pointer: coarse)').matches)) drawTouch(g);
   n.fade = 1;
   if (g.audio.open) g.audio.draw();
-  c.globalCompositeOperation = 'source-over';
 }

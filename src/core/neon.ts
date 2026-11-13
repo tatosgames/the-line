@@ -6,6 +6,7 @@
 // where a phone's thumbs go. World y = 0 is the line's rest height; negative y is up.
 
 import { GLYPH_H, pixelText, pixelTextWidth } from './pixelfont';
+import { RenderPath } from './renderPath';
 
 export const COLORS = {
   line: '#ffd21f',
@@ -25,7 +26,7 @@ export const smooth = (t: number) => { t = clamp(t, 0, 1); return t * t * (3 - 2
 export const rand = (a: number, b: number) => a + Math.random() * (b - a);
 
 /** Straight segments through flat [x0, y0, x1, y1, ...] points. */
-export function polyPath(p: Pts, closed = false, path = new Path2D()): Path2D {
+export function polyPath(p: Pts, closed = false, path = new RenderPath()): RenderPath {
   path.moveTo(p[0], p[1]);
   for (let i = 2; i < p.length; i += 2) path.lineTo(p[i], p[i + 1]);
   if (closed) path.closePath();
@@ -33,7 +34,7 @@ export function polyPath(p: Pts, closed = false, path = new Path2D()): Path2D {
 }
 
 /** A smooth curve through the midpoints of flat points, passing through both ends. */
-export function smoothPath(p: Pts, path = new Path2D(), move = true): Path2D {
+export function smoothPath(p: Pts, path = new RenderPath(), move = true): RenderPath {
   const n = p.length / 2;
   if (move) path.moveTo(p[0], p[1]); else path.lineTo(p[0], p[1]);
   if (n < 3) { for (let i = 1; i < n; i++) path.lineTo(p[i * 2], p[i * 2 + 1]); return path; }
@@ -93,25 +94,29 @@ export class Neon {
   /** Extra magnification on top of the fit-to-screen scale (the animation lab zooms in). */
   zoom = 1;
   /** What world() draws is this much smaller, around the middle of the screen, and this far down (CSS px): a line further away. */
-  private depthK = 1;
-  private depthY = 0;
-  private sx = 0;
-  private sy = 0;
+  protected depthK = 1;
+  protected depthY = 0;
+  protected sx = 0;
+  protected sy = 0;
   private clipped = false;
 
-  constructor(readonly canvas: HTMLCanvasElement) {
-    this.ctx = canvas.getContext('2d', { alpha: false })!;
+  constructor(readonly canvas: HTMLCanvasElement, private readonly layout = fitArea, contextCanvas = canvas) {
+    this.ctx = contextCanvas.getContext('2d', { alpha: false })!;
     this.resize();
   }
+
+  fitViewport(width: number, height: number) { return this.layout(width, height); }
 
   resize() {
     // A tab opened in the background can report a 0x0 window.
     this.fullW = Math.max(1, this.canvas.clientWidth || window.innerWidth);
     this.fullH = Math.max(1, this.canvas.clientHeight || window.innerHeight);
-    const a = fitArea(this.fullW, this.fullH);
+    const a = this.layout(this.fullW, this.fullH);
     this.dpr = this.retro ? RETRO_W / a.w : Math.min(window.devicePixelRatio || 1, 2);
-    this.canvas.width = Math.round(this.fullW * this.dpr);
-    this.canvas.height = Math.round(this.fullH * this.dpr);
+    if (this.ctx.canvas === this.canvas) {
+      this.canvas.width = Math.round(this.fullW * this.dpr);
+      this.canvas.height = Math.round(this.fullH * this.dpr);
+    }
     this.canvas.style.imageRendering = this.retro ? 'pixelated' : '';
     this.clipped = false; // Resizing a canvas resets its state.
     this.w = a.w; this.h = a.h; this.ox = a.x; this.oy = a.y;
@@ -130,12 +135,16 @@ export class Neon {
     return [(x - this.camX) * this.unit + this.sx, this.lineY + y * this.unit + this.sy];
   }
 
-  begin(dt: number) {
+  prepareFrame(dt: number) {
     if ((this.canvas.clientWidth || window.innerWidth) !== this.fullW || (this.canvas.clientHeight || window.innerHeight) !== this.fullH) this.resize();
     this.shake = Math.max(0, this.shake - dt * 12);
     const s = this.shake * this.unit;
     this.sx = (Math.random() - 0.5) * s;
     this.sy = (Math.random() - 0.5) * s;
+  }
+
+  begin(dt: number) {
+    this.prepareFrame(dt);
     const c = this.ctx;
     this.overlay();
     c.globalCompositeOperation = 'source-over';
@@ -165,8 +174,74 @@ export class Neon {
   }
 
   world() {
-    const u = this.unit * this.depthK, k = this.dpr * u;
-    this.ctx.setTransform(k, 0, 0, k, this.dpr * (this.ox + this.w / 2 - (this.camX + this.viewW / 2) * u + this.sx), this.dpr * (this.oy + this.lineY + this.depthY + this.sy));
+    const [u, x, y] = this.worldTransform();
+    this.ctx.setTransform(this.dpr * u, 0, 0, this.dpr * u, this.dpr * x, this.dpr * y);
+  }
+
+  protected worldTransform() {
+    const u = this.unit * this.depthK;
+    return [u, this.ox + this.w / 2 - (this.camX + this.viewW / 2) * u + this.sx, this.oy + this.lineY + this.depthY + this.sy];
+  }
+
+  hud() {}
+  modal() {}
+  get bloomAvailable() { return false; }
+  get bloom() { return false; }
+  toggleBloom() {}
+  transform(a: number, d: number, y = 0) { this.ctx.transform(a, 0, 0, d, 0, y); }
+  cursor(value: string) { this.canvas.style.cursor = value; }
+
+  fillRect(x: number, y: number, w: number, h: number, color: string, alpha = 1, additive = false) {
+    const c = this.ctx;
+    c.globalCompositeOperation = additive ? 'lighter' : 'source-over';
+    c.globalAlpha = alpha;
+    c.fillStyle = color;
+    c.fillRect(x, y, w, h);
+    c.globalAlpha = 1;
+  }
+
+  fillCircle(x: number, y: number, radius: number, color: string) {
+    const c = this.ctx;
+    c.globalCompositeOperation = 'source-over';
+    c.globalAlpha = 1;
+    c.fillStyle = color;
+    c.beginPath();
+    c.arc(x, y, radius, 0, Math.PI * 2);
+    c.fill();
+  }
+
+  haze(x: number, y: number, rx: number, ry: number, color: number[], alpha: number) {
+    const c = this.ctx, rgb = color.join(',');
+    c.globalCompositeOperation = 'lighter';
+    c.save();
+    c.translate(x, y);
+    c.scale(1, ry / rx);
+    const gradient = c.createRadialGradient(0, 0, 0, 0, 0, rx);
+    gradient.addColorStop(0, `rgba(${rgb},${alpha})`);
+    gradient.addColorStop(0.7, `rgba(${rgb},${alpha * 0.6})`);
+    gradient.addColorStop(1, `rgba(${rgb},0)`);
+    c.fillStyle = gradient;
+    c.fillRect(-rx, -rx, rx * 2, rx * 2);
+    c.restore();
+  }
+
+  titleGlow(path: RenderPath, color: string, width: number, bloom: number) {
+    const c = this.ctx;
+    c.globalCompositeOperation = 'lighter';
+    c.shadowColor = color;
+    c.shadowBlur = width * bloom * this.dpr;
+    c.strokeStyle = color;
+    c.lineCap = c.lineJoin = 'round';
+    c.lineWidth = width;
+    c.globalAlpha = 0.55;
+    c.stroke(path.canvasPath());
+    c.shadowBlur = 0;
+    c.globalAlpha = 1;
+    this.glow(path, color, width);
+  }
+
+  lineGlow(path: RenderPath, color: string, width: number, intensity = 1) {
+    this.glow(path, color, width, intensity);
   }
 
   /** How far away what world() draws is. With no arguments, right here. */
@@ -194,7 +269,7 @@ export class Neon {
   wordOnLine(s: string, x: number, y: number, size: number, color = COLORS.line) {
     const c = this.ctx;
     if (this.retro) {
-      const scale = this.wordScale(size), sx = (x + this.ox) * this.dpr, path = new Path2D();
+      const scale = this.wordScale(size), sx = (x + this.ox) * this.dpr, path = new RenderPath();
       pixelText(path, s, Math.round(sx - (pixelTextWidth(s) * scale) / 2), Math.round((y + this.oy) * this.dpr) - GLYPH_H * scale, scale);
       this.fillPixels(path, color);
       return;
@@ -226,11 +301,11 @@ export class Neon {
   }
 
   /** Text in nostalgia mode: the pixel font on whole pixels, with no glow to smear it. */
-  private retroText(s: string, x: number, y: number, size: number, color: string, align: CanvasTextAlign, alpha: number) {
+  protected retroText(s: string, x: number, y: number, size: number, color: string, align: CanvasTextAlign, alpha: number) {
     const scale = Math.max(1, Math.floor((size * this.dpr) / RETRO_TEXT_STEP));
     const w = pixelTextWidth(s) * scale, sx = (x + this.ox) * this.dpr, sy = (y + this.oy) * this.dpr;
     const left = Math.round(align === 'center' ? sx - w / 2 : align === 'right' ? sx - w : sx);
-    const path = new Path2D();
+    const path = new RenderPath();
     pixelText(path, s, left, Math.round(sy - (GLYPH_H * scale) / 2), scale);
     this.fillPixels(path, color, alpha);
   }
@@ -241,27 +316,27 @@ export class Neon {
   }
 
   /** Nostalgia mode: fills a path made of whole pixels, with no glow. */
-  fillPixels(path: Path2D, color: string, alpha = 1) {
+  fillPixels(path: RenderPath | Path2D, color: string, alpha = 1) {
     const c = this.ctx;
     c.setTransform(1, 0, 0, 1, 0, 0);
     c.globalCompositeOperation = 'lighter';
     c.globalAlpha = alpha * this.fade;
     c.fillStyle = color;
-    c.fill(path);
+    c.fill(path instanceof RenderPath ? path.canvasPath() : path);
     c.globalAlpha = 1;
     this.screen();
   }
 
   /** Nostalgia mode: a picture whose rows of '#' are pixels, with its top left corner on this whole pixel. */
   sprite(rows: readonly string[], px: number, py: number, color: string, alpha = 1) {
-    const path = new Path2D();
+    const path = new RenderPath();
     rows.forEach((row, r) => { for (let i = 0; i < row.length; i++) if (row[i] === '#') path.rect(px + i, py + r, 1, 1); });
     this.fillPixels(path, color, alpha);
   }
 
   /** Nostalgia mode: a one pixel outline of a box given in the coordinates screen() draws in. */
   pixelFrame(x: number, y: number, w: number, h: number, color: string, alpha = 1) {
-    const [x0, y0] = this.toPixel(x, y), [x1, y1] = this.toPixel(x + w, y + h), path = new Path2D();
+    const [x0, y0] = this.toPixel(x, y), [x1, y1] = this.toPixel(x + w, y + h), path = new RenderPath();
     path.rect(x0, y0, x1 - x0 + 1, 1);
     path.rect(x0, y1, x1 - x0 + 1, 1);
     path.rect(x0, y0 + 1, 1, y1 - y0 - 1);
@@ -291,7 +366,8 @@ export class Neon {
   }
 
   /** Stroke a path as a glowing tube: wide faint halo, tight glow, solid core, hot centre. */
-  glow(path: Path2D, color: string, width = 0.8, intensity = 1) {
+  glow(source: RenderPath | Path2D, color: string, width = 0.8, intensity = 1) {
+    const path = source instanceof RenderPath ? source.canvasPath() : source;
     const c = this.ctx, fade = this.fade;
     c.globalCompositeOperation = 'lighter';
     c.lineCap = 'round';

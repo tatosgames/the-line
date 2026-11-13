@@ -6,14 +6,10 @@
 
 import { audioPrefs, saveAudioPrefs } from './audioPrefs';
 import { LAYERS, Music, type Meter } from './music';
+import { loadSample, sampleManifest, SAMPLES, type Sample } from './samples';
 import { STYLES, styleById, type Style } from './styles';
 
-const SAMPLES = {
-  appear: 'compare', vanish: 'sparisce', drag: 'colpisce', kill: 'snawave_sparisce',
-  flipDown: 'rovescia_in_giu', flipUp: 'rovescia_in_su', offline: 'offline', eaten: 'eated',
-  snawave: 'snawave', level: 'levelpass', reflux: 'reflux', pop: 'bollapop', bonus: 'linesaver',
-} as const;
-export type Sample = keyof typeof SAMPLES;
+export type { Sample } from './samples';
 
 /** Beats are scheduled this far ahead (s), so a late frame can't make the click stumble. */
 const BEAT_AHEAD = 0.03;
@@ -120,13 +116,15 @@ class Sfx {
     this.music.init(ctx, this.master);
     this.music.setCrush(this.crushed);
     this.applyTint(60 / 75);
-    for (const [key, file] of Object.entries(SAMPLES) as [Sample, string][]) {
-      fetch(`assets/sounds/${file}.wav`)
-        .then((r) => r.arrayBuffer())
-        .then((b) => this.ctx!.decodeAudioData(b))
-        .then((buf) => this.buffers.set(key, buf))
-        .catch(() => {});
-    }
+    void this.loadSamples(ctx);
+  }
+
+  private async loadSamples(ctx: AudioContext) {
+    const manifest = await sampleManifest();
+    await Promise.all((Object.keys(SAMPLES) as Sample[]).map(async (id) => {
+      const buffer = await loadSample((bytes) => ctx.decodeAudioData(bytes), id, manifest);
+      if (buffer) this.buffers.set(id, buffer);
+    }));
   }
 
   play(name: Sample, volume = 1) {

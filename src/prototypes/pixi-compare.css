@@ -1,0 +1,34 @@
+:root {
+  color-scheme: dark;
+  font-family: system-ui, sans-serif;
+  color: #f6f1e8;
+  background: #111019;
+}
+
+body { margin: 0; }
+main { max-width: 76rem; margin: auto; padding: clamp(1rem, 4vw, 3rem); }
+a { color: #ffd21f; }
+h1 { margin: 1rem 0 0.25rem; font-size: clamp(1.75rem, 4vw, 3rem); }
+p { margin: 0; color: #c7c1d1; }
+.controls { display: flex; flex-wrap: wrap; gap: 0.5rem; margin: 1.25rem 0; }
+button {
+  padding: 0.55rem 1rem;
+  font: inherit;
+  color: inherit;
+  background: #272331;
+  border: 1px solid #635d70;
+  border-radius: 0.375rem;
+  cursor: pointer;
+}
+button:hover { background: #383140; }
+:focus-visible { outline: 2px solid #ffd21f; outline-offset: 3px; }
+.comparison { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 1rem; }
+h2 { margin: 0 0 0.5rem; font-size: 1rem; font-weight: 600; }
+.viewport { position: relative; aspect-ratio: 16 / 9; background: #05030f; outline: 1px solid #373143; }
+canvas { position: absolute; inset: 0; display: block; width: 100%; height: 100%; cursor: crosshair; }
+#pixi-status { position: absolute; inset: 0; display: grid; place-items: center; text-align: center; padding: 1rem; pointer-events: none; }
+#pixi-status[hidden] { display: none; }
+
+@media (max-width: 44rem) {
+  .comparison { grid-template-columns: 1fr; }
+}

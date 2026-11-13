@@ -21,6 +21,7 @@
 // next. His sizes are his armour, as Wavell's are: each hit takes one and makes him
 // angrier, and with each phase he has more powers.
 
+import { RenderPath } from '../../core/renderPath';
 import type { SpringLine } from '../line';
 import { DIFF } from '../../data/difficulty';
 import { BOSS, type EyeDef, type ShapeDef, type Step } from '../../data/boss';
@@ -453,24 +454,24 @@ export class Flattener {
       }
       // The shot's way out, and the charge glowing in it.
       if (def.kind === 'path' && def.emit) {
-        const [bx, by] = this.butt(line), x = new Path2D();
+        const [bx, by] = this.butt(line), x = new RenderPath();
         x.moveTo(bx - 2, by - 2); x.lineTo(bx + 2, by + 2); x.moveTo(bx + 2, by - 2); x.lineTo(bx - 2, by + 2);
         neon.glow(x, COLORS.line, 0.8, show);
         if (this.charging && this.step?.fire === 'shoot') {
-          const c = this.charge, ball = new Path2D();
+          const c = this.charge, ball = new RenderPath();
           ball.arc(bx, by, 0.5 + c * 4 + Math.sin(this.time * 40) * 0.4 * c, 0, Math.PI * 2);
           neon.glow(ball, COLORS.danger, 1, 0.4 + c);
         }
       }
       if (def.kind === 'path' && def.nose) {
-        const [nx, ny] = this.at(line, def.nose[0] * k, def.nose[1] * k * side * this.rear()), nose = new Path2D();
+        const [nx, ny] = this.at(line, def.nose[0] * k, def.nose[1] * k * side * this.rear()), nose = new RenderPath();
         nose.arc(nx, ny, 1.1 * k, 0, Math.PI * 2);
         neon.glow(nose, COLORS.eye, 0.8, 1.2 * show);
       }
     }
     // The saw's hub.
     if (def.kind === 'saw' && m > 0.3 && this.state !== 'melt') {
-      const [cx, cy] = this.at(line, 0, 0), hub = new Path2D();
+      const [cx, cy] = this.at(line, 0, 0), hub = new RenderPath();
       hub.arc(cx, cy, this.sawR * 0.35, 0, Math.PI * 2);
       neon.glow(hub, COLORS.danger, 0.7, 0.6 + this.charge);
     }
@@ -479,14 +480,14 @@ export class Flattener {
       const e = this.eyes[i];
       if (e.r < 0.6) continue;
       const [ex, ey] = this.at(line, e.dx, e.h);
-      const eye = new Path2D();
+      const eye = new RenderPath();
       eye.arc(ex, ey, e.r, 0, Math.PI * 2);
       neon.glow(eye, COLORS.line, 0.7, 1.2);
-      const pupil = new Path2D();
+      const pupil = new RenderPath();
       pupil.arc(ex + look * e.r * 0.4, ey + e.r * 0.1 * side, e.r * 0.38, 0, Math.PI * 2);
       neon.glow(pupil, COLORS.eye, 0.8, 1.4);
       // A heavy lid slanting down to the middle: he means it.
-      const lid = new Path2D(), d = i === 0 ? 1 : -1;
+      const lid = new RenderPath(), d = i === 0 ? 1 : -1;
       lid.moveTo(ex - e.r * 1.1 * d, ey - e.r * 1.25 * side);
       lid.lineTo(ex + e.r * 0.9 * d, ey - e.r * 0.55 * side);
       neon.glow(lid, COLORS.danger, 0.7, 0.9);

@@ -24,7 +24,10 @@ function fakeNeon() {
 }
 
 function fakeInput() {
-  return { onKey: new Map(), uiTap: null, touchUsed: false, poll() {}, setBindings() {}, binds: defaultBindings(), anyPressed: false, ...IDLE } as unknown as Input;
+  return {
+    onKey: new Map(), uiTap: null, touchUsed: false, poll() {}, setBindings() {}, binds: defaultBindings(),
+    anyPressed: false, resetEpoch: 0, controls: () => ({ ...IDLE }), ...IDLE,
+  } as unknown as Input;
 }
 
 export function headlessGame() {

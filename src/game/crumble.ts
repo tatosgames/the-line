@@ -3,6 +3,7 @@
 // has passed drifts off as sparks. The line now starts where the creature ends, so the
 // creature is the end of the line until the break has run its length.
 
+import { RenderPath } from '../core/renderPath';
 import { COLORS, Neon, clamp, polyPath, rand, smoothPath } from '../core/neon';
 import { TUNE } from '../data/tune';
 import { arcLengths, pointAt } from './actors/wavell';
@@ -113,7 +114,7 @@ export class Crumble {
     const main = this.contours[0], pts = main.world(line), d = k * main.total, hot: number[] = [];
     for (let i = 0; i <= 5; i++) hot.push(...pointAt(pts, main.lens, Math.min(main.total, d + (HOT * i) / 5)));
     neon.glow(polyPath(hot, false), COLORS.danger, 1.3, 0.7 + rand(0, 0.5));
-    const core = new Path2D();
+    const core = new RenderPath();
     core.arc(this.ember[0], this.ember[1], 0.9 + rand(0, 0.5), 0, Math.PI * 2);
     neon.glow(core, '#ffffff', 1.2, 1.4);
   }
