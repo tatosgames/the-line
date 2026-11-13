@@ -49,9 +49,9 @@ On a computer, the keys and the joypad's buttons can be changed from CONTROL in 
 | Float | Away from it: ↑ or W on top, ↓ or S underneath | Away from it | Left thumb, away from it |
 | Pull | X or Ctrl | X | Right thumb, swipe sideways |
 | Wipe | Z, Shift or Space | A | Right thumb, swipe up or down |
-| Mute | M | | Speaker icon |
-| Fullscreen | F | | Corners icon, under the audio icon (not in the installed app) |
-| Nostalgia (low resolution look) | N | | Checkerboard icon |
+| Mute | M | | Settings → Sound |
+| Fullscreen | F | | Settings → Fullscreen (where supported) |
+| Nostalgia (low resolution look) | N | | Settings → Nostalgia |
 | Pause | P | Start | |
 | Back to the start screen | Esc | Back | |
 
@@ -63,7 +63,7 @@ Every screen shows the same 16:9 play area, 356x200 world units, so nobody sees 
 
 ### On a phone
 
-In portrait, the play area sits above the two touch gesture zones. In landscape, the play area fits the available screen and the touch controls sit near the lower corners. The corners icon goes fullscreen, except on iPhones.
+In portrait, the play area sits above the two touch gesture zones. In landscape, the play area fits the available screen and the touch controls sit near the lower corners. Use Settings → Fullscreen where supported.
 
 To install the game as an app, which also lets it play offline:
 
@@ -236,7 +236,7 @@ docs/              Game rules reference (RULES.md), design notes and the origina
 
 Run `npm run dev` and open `/pixi-compare.html`. Both panels draw the same vibrating line, with the game's Canvas 2D glow on one side and an additive PixiJS mesh on the other. Click or tap either panel to send a pulse through both. Pause to compare a still frame, or reset to replay the opening waves. The Pixi panel requires WebGL.
 
-To try the full game in Pixi, open `/?renderer=pixi`. Use `/?renderer=canvas` to select Canvas explicitly. The game currently defaults to Canvas and falls back to it if WebGL fails to start or its context is lost. In Pixi, open the speaker menu to toggle **Bloom**. The effect is off by default and is suspended in Nostalgia mode.
+To try the full game in Pixi, open `/?renderer=pixi`. Use `/?renderer=canvas` to select Canvas explicitly. The game currently defaults to Canvas and falls back to it if WebGL fails to start or its context is lost. In Pixi, open the settings menu to toggle **Bloom**. The effect is off by default and is suspended in Nostalgia mode.
 
 See [the migration plan and benchmark commands](pixi-migration-plan.md) for the promotion gates.
 

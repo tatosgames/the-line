@@ -1,7 +1,6 @@
-// The audio menu: a window over the game, opened from the speaker button up to the right.
-// Sound on or off, the music style and the time signature. While it is open the game
-// waits, and the music plays on its own so a choice can be heard straight away.
+// The settings menu pauses gameplay while audio keeps playing for previews.
 
+import { canFullscreen, isFullscreen, toggleFullscreen } from '../core/app';
 import { RenderPath } from '../core/renderPath';
 import { audioPrefs, saveAudioPrefs } from '../core/audioPrefs';
 import type { Input } from '../core/input';
@@ -11,13 +10,14 @@ import { sfx } from '../core/sfx';
 import type { Game } from './game';
 import { hudSize } from './hud';
 
-type Row = 'sound' | 'style' | 'meter' | 'bloom' | 'close';
-const ROWS: readonly Row[] = ['sound', 'style', 'meter', 'close'];
-const PIXI_ROWS: readonly Row[] = ['sound', 'style', 'meter', 'bloom', 'close'];
-const LABELS: Record<Row, string> = { sound: 'SOUND', style: 'MUSIC', meter: 'TIME', bloom: 'BLOOM', close: 'CLOSE' };
+type Row = 'sound' | 'style' | 'meter' | 'nostalgia' | 'fullscreen' | 'bloom' | 'close';
+const LABELS: Record<Row, string> = {
+  sound: 'SOUND', style: 'MUSIC', meter: 'TIME', nostalgia: 'NOSTALGIA',
+  fullscreen: 'FULLSCREEN', bloom: 'BLOOM', close: 'CLOSE',
+};
 const GOLD = '#c9a640';
 /** The window's size and the rows' spacing, in HUD sizes. */
-const BOX_W = 15, ROW_TOP = 2.5, ROW_H = 1.3, FOOT = 1.6;
+const BOX_W = 19, ROW_TOP = 2.8, ROW_H = 1.55, FOOT = 1.65;
 
 const mod = (v: number, m: number) => ((v % m) + m) % m;
 
@@ -37,10 +37,17 @@ export class AudioMenu {
   }
 
   hide() { this.open = false; }
-  private get rows() { return this.g.neon.bloomAvailable ? PIXI_ROWS : ROWS; }
+  private get rows(): Row[] {
+    const rows: Row[] = ['sound', 'style', 'meter', 'nostalgia'];
+    if (canFullscreen()) rows.push('fullscreen');
+    if (this.g.neon.bloomAvailable) rows.push('bloom');
+    rows.push('close');
+    return rows;
+  }
 
   private box(n: Neon) {
-    const s = hudSize(n), w = s * BOX_W, h = s * (ROW_TOP + this.rows.length * ROW_H + FOOT);
+    const height = ROW_TOP + (this.rows.length - 1) * ROW_H + FOOT;
+    const s = Math.min(hudSize(n) * 1.35, n.h * 0.9 / height), w = s * BOX_W, h = s * height;
     return { s, x: (n.w - w) / 2, y: (n.h - h) / 2, w, h };
   }
 
@@ -91,6 +98,8 @@ export class AudioMenu {
   private change(row: Row, d: number) {
     if (row === 'close') { this.g.closeAudio(); return; }
     if (row === 'bloom') { this.g.neon.toggleBloom(); return; }
+    if (row === 'nostalgia') { this.g.setNostalgia(!this.g.neon.retro); return; }
+    if (row === 'fullscreen') { void toggleFullscreen(); return; }
     if (row === 'sound') sfx.toggleMute();
     else if (row === 'style') sfx.cycleStyle(d);
     else {
@@ -107,11 +116,13 @@ export class AudioMenu {
     if (row === 'style') return sfx.style.name;
     if (row === 'meter') return meterById(audioPrefs.meter).id;
     if (row === 'bloom') return this.g.neon.bloom ? 'ON' : 'OFF';
+    if (row === 'nostalgia') return this.g.neon.retro ? 'ON' : 'OFF';
+    if (row === 'fullscreen') return isFullscreen() ? 'ON' : 'OFF';
     return '';
   }
 
   draw() {
-    const n = this.g.neon, b = this.box(n), s = b.s, inp = this.g.input, touch = inp.touchUsed;
+    const n = this.g.neon, b = this.box(n), s = b.s;
     n.modal();
     n.screen();
     // The game dims behind the window.
@@ -122,7 +133,8 @@ export class AudioMenu {
       frame.rect(b.x, b.y, b.w, b.h);
       n.glow(frame, GOLD, 1, 0.5);
     }
-    n.text('AUDIO', n.w / 2, b.y + s * 1.2, s * 0.9, COLORS.hud);
+    n.text('SETTINGS', n.w / 2, b.y + s, s * 0.9, COLORS.hud);
+    n.text(`${Math.round(this.g.beat.bpm)} BPM`, b.x + b.w - s * 0.65, b.y + s, s * 0.52, GOLD, 'right');
     const left = n.w / 2 - s * 0.6, right = n.w / 2 + s * 0.6, size = s * 0.68;
     this.rows.forEach((row, i) => {
       const y = this.rowY(i), on = i === this.row, color = on ? COLORS.hud : GOLD, alpha = on ? 1 : 0.8;
@@ -134,10 +146,6 @@ export class AudioMenu {
       n.text(LABELS[row], left, y, size, color, 'right', alpha);
       n.text(`< ${this.value(row)} >`, right, y, size, color, 'left', alpha);
     });
-    const foot = n.retro ? 'MUSIC BITCRUSHED'
-      : touch ? 'tap a choice to change it   tap outside to close'
-        : '← → change   Esc close';
-    n.text(foot, n.w / 2, b.y + b.h - s * 0.9, s * 0.48, GOLD, 'center', 0.8);
     n.cursor('');
   }
 }

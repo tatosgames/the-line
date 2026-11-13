@@ -38,9 +38,9 @@ The player can change keys and joypad buttons under CONTROL in the menu. These a
 | Float in a bubble | Away from it: ↑/W on top, ↓/S underneath | Away from it | Left thumb, away from the line |
 | Pull | X or Ctrl | X | Right thumb, swipe sideways |
 | Wipe | Z, Shift or Space | A | Right thumb, swipe up or down |
-| Mute | M | | Speaker icon |
-| Fullscreen | F | | Corners icon, under the audio icon (not in the installed app) |
-| Nostalgia (low-resolution look) | N | | Checkerboard icon |
+| Mute | M | | Settings → Sound |
+| Fullscreen | F | | Settings → Fullscreen (where supported) |
+| Nostalgia (low-resolution look) | N | | Settings → Nostalgia |
 | Pause | P | Start | |
 | Back to the start screen | Esc | Back | |
 
@@ -157,7 +157,7 @@ Level 10 is the boss fight. On reaching it, every enemy on the line sinks, and T
 - **He walks on to the right**, about 150 u ahead and always in view (the knob says how far, but never past the edge of the view), at 60 u/s, faster (up to 170 u/s) when Wavell closes in. He waits at the edge of the view if Wavell stops. Walking into him hurts and throws Wavell back.
 - **The end of the line** crumbles at a steady 60 u/s during the fight.
 - **Only his own front wave hurts him**, sent back at him while he is in his place (not while he is rolling as a saw).
-- **His sizes are his armour**: 3 hits flatten him. Each hit takes a size, throws him back, and he is safe for 1.1 s. The circles next to his name at the top show what is left. He is a little bigger for each size he has.
+- **His sizes are his armour**: 3 hits flatten him. Each hit takes a size, throws him back, and he is safe for 1.1 s. The orange circles at the top centre show what is left. He is a little bigger for each size he has.
 
 | Power | His shape | Telegraph | Answer |
 | --- | --- | --- | --- |
@@ -260,7 +260,7 @@ The game has no recorded soundtrack. Web Audio synthesizes every note as the gam
 - The line lights up on each beat, brighter on the first beat of a bar, so the beat can be seen with the sound off.
 - **Enemies come in on the beat**: on the last beat of the bar, and from level 6 also on the beat half a bar before it. That is never more than two per bar. Kinds take turns: the one furthest past its due time goes next. A Sinepede is called 2 beats ahead of its cue beat, so its hum is heard first.
 - **Enemy actions wait for the beat**: a Disturchin's spikes, a Backwave or Reflux setting off, a Bubble Burst letting go or bursting. Warnings and fuses last whole beats.
-- **Time signature** (2/4, 3/4, 4/4, 5/4, 6/8 or 7/8, from the audio menu) sets the beats per bar. A change waits for the next bar.
+- **Time signature** (2/4, 3/4, 4/4, 5/4, 6/8 or 7/8, from Settings) sets the beats per bar. A change waits for the next bar.
 
 ### Music styles
 
@@ -290,16 +290,16 @@ The game has no recorded soundtrack. Web Audio synthesizes every note as the gam
 - **Wavell:** a bright run of notes when he grows, a falling one when he shrinks.
 - **Samples** from the original 2003 game cover the rest: appearing, vanishing, flipping down and up, hits, kills, being eaten, Reflux, bubble pop, level pass and the Backwave bonus.
 
-### Audio menu
+### Settings
 
-- The speaker button at the top right opens it: sound on or off, music style, time signature.
+- The settings button at the top right opens sound, music, time signature, and display options. The current tempo is shown there.
 - The game pauses while it is open, and the music keeps playing so a choice can be heard at once.
 - M mutes in one press. Audio choices are saved in the browser.
 
 ### Start screen
 
 - The start screen plays the chosen style, all five instruments, once the title has formed and Wavell has risen out of the line. Browsers only allow sound after the first tap or key, so on a first visit it starts then.
-- It keeps the game's own beat clock, so it keeps playing through the audio menu without going back to the first bar.
+- It keeps the game's own beat clock, so it keeps playing through Settings without going back to the first bar.
 - Picking START doesn't restart it: the same beat and bar carry on, and the music thins to level 1's one instrument while the other four fade away over a second or two. Each level then adds one back.
 
 ## Visuals and screens
@@ -311,16 +311,16 @@ Everything is drawn as glowing vector strokes at the screen's native resolution.
 - **Dying.** Killed by an enemy, he sinks back into the line looking up (0.6 s) until one raised hand is the last of him. Burnt by the end of the line, the break runs along his outline from foot to foot (1.25 s) and drifts away in sparks.
 - **Enemy deaths.** A killed creature melts into a hump that rolls on with the wave that hit it. A Sinepede leaves a ripple as each segment dies.
 - **Screens.** The title is one unbroken stroke. Starting a game breaks it apart. At game over, FLATLINED appears and turns back into the title.
-- **HUD.** Top left: size circles, with the lead gauge under them. Score with its multiplier to the left. Points pop up where they are earned. A banner shows each new level. During the boss fight, THE FLATTENER and a circle for each size he has left sit under the level.
-- **Nostalgia mode** (N or the checkerboard icon) gives a low-resolution look and is saved in the browser.
-- **Bloom** is available in the speaker menu when using the experimental Pixi renderer. It defaults to off, is saved separately, and is suspended in Nostalgia mode.
+- **HUD.** Top left: size circles, with the lead gauge under them. Top right: compact score and multiplier, plus Settings. Points pop up where they are earned. Banners announce level changes and introduce THE FLATTENER. Orange circles at the top centre track his remaining hits. The line itself signals the beat.
+- **Nostalgia mode** (N or Settings → Nostalgia) gives a low-resolution look and is saved in the browser.
+- **Bloom** is available in the settings menu when using the experimental Pixi renderer. It defaults to off, is saved separately, and is suspended in Nostalgia mode.
 
 ## Platform and saving
 
 The game runs in the browser at <https://matamadio.github.io/the-line/> and installs as an app (PWA), which also lets it play offline.
 
 - **Saved in the browser:** best score, key bindings, audio choices (mute, style, time signature) and Nostalgia mode. Nothing is saved online.
-- **Phones:** the game fits the same 16:9 play area in either orientation. In portrait, start movement and attack gestures below the play area. In landscape, the thumb controls are near the lower corners. The corners icon goes fullscreen, except on iPhone. Install from the start screen's install button; on iPhone, from the Share menu.
+- **Phones:** the game fits the same 16:9 play area in either orientation. In portrait, start movement and attack gestures below the play area. In landscape, the thumb controls are near the lower corners. Use Settings → Fullscreen where supported. Install from the start screen's install button or from the Share menu on iPhone.
 - **Shared origin:** several apps live on matamadio.github.io, so the manifest needs its own explicit id (`/the-line/`).
 - **Sound** only starts after the first tap or key press, as browsers require.
 

@@ -255,17 +255,17 @@ function drawSizes(g: Game, x: number, y: number) {
     const cx = x + i * 11, whole = i < W.size;
     const ring = new RenderPath();
     ring.arc(cx, y, 4, 0, Math.PI * 2);
-    n.glow(ring, COLORS.wavell, 0.4, whole ? 0 : 0.22);
+    n.glow(ring, COLORS.wavell, 0.4, whole ? 0 : 0.3);
     if (whole) {
       const p = new RenderPath();
       p.arc(cx, y, 4, 0, Math.PI * 2);
       p.moveTo(cx - 2.2, y - 1.4); p.lineTo(cx - 0.8, y - 0.8);
       p.moveTo(cx + 2.2, y - 1.4); p.lineTo(cx + 0.8, y - 0.8);
-      n.glow(p, COLORS.wavell, 0.6);
+      n.glow(p, COLORS.wavell, 0.75);
     } else if (i === W.size && W.sparks > 0) {
       const p = new RenderPath();
       p.arc(cx, y, 4, top, top + Math.PI * 2 * W.sparks / DIFF.sparksPerSize);
-      n.glow(p, COLORS.wavell, 0.6);
+      n.glow(p, COLORS.wavell, 0.85);
     }
   }
 }

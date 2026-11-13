@@ -10,7 +10,7 @@ import { METERS } from '../src/core/music';
 import { I } from '../src/data/anim';
 import { TUNE } from '../src/data/tune';
 import { MORPH_TIME, TitleDust } from '../src/game/title';
-import { TITLE_HINTS, VERSION_TEXT, audioButton, nostalgiaButton } from '../src/game/hud';
+import { TITLE_HINTS, VERSION_TEXT, settingsButton } from '../src/game/hud';
 import { strokeWord } from '../src/game/lettering';
 import { CREDIT_NAMES, ENTRIES, MENU_FOCUS, depthScale } from '../src/game/menu';
 import { ACTIONS, bindKey, bindPad, defaultBindings, keyLabel, padLabel } from '../src/core/controls';
@@ -524,15 +524,16 @@ describe('nostalgia mode', () => {
     for (const t of texts) for (const ch of t) expect(hasGlyph(ch), ch).toBe(true);
   });
 
-  it('goes on and off from its key and its button, and redraws at the new size', () => {
+  it('goes on and off from its key and settings, and redraws at the new size', () => {
     vi.stubGlobal('document', { fullscreenEnabled: false });
     const g = headlessGame(), resize = vi.fn();
     Object.assign(g.neon, { resize, retro: false });
     g.input.onKey.get('KeyN')!();
     expect(g.neon.retro).toBe(true);
     expect(resize).toHaveBeenCalledTimes(1);
-    const [x, y] = nostalgiaButton(g.neon);
-    g.input.uiTap!(x, y)!();
+    g.openAudio();
+    g.audio.row = 3;
+    g.audio.handle({ confirm: true, mouseX: -1, mouseY: -1 } as Input);
     expect(g.neon.retro).toBe(false);
     expect(resize).toHaveBeenCalledTimes(2);
     vi.unstubAllGlobals();
@@ -542,10 +543,10 @@ describe('nostalgia mode', () => {
 describe('the audio menu', () => {
   const press = (over: Partial<Input>) => ({ menuUp: false, menuDown: false, menuLeft: false, menuRight: false, confirm: false, mouseX: -1, mouseY: -1, ...over }) as Input;
 
-  it('opens from the speaker button without muting, and the game waits for it', () => {
+  it('opens from the settings button without muting, and the game waits for it', () => {
     const g = headlessGame();
     g.start();
-    const [x, y] = audioButton(g.neon);
+    const [x, y] = settingsButton(g.neon);
     g.input.uiTap!(x, y)!();
     expect(g.audio.open).toBe(true);
     expect(g.paused).toBe(true);

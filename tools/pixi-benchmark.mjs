@@ -398,9 +398,16 @@ try {
       await delay(250);
       await click(1234, 36);
       await delay(120);
-      await click(720, 399);
+      const bloomY = await cdp.eval(`(() => {
+        const fullscreen = document.fullscreenEnabled && !matchMedia('(display-mode: standalone)').matches;
+        const row = fullscreen ? 5 : 4;
+        const height = 2.8 + (row + 1) * 1.55 + 1.65;
+        const s = Math.min(720 * 0.045 * 1.35, 720 * 0.9 / height);
+        return (720 - s * height) / 2 + s * (2.8 + row * 1.55);
+      })()`);
+      await click(720, bloomY);
       await until(() => cdp.eval("localStorage.getItem('the-line-bloom') === '1'"));
-      await click(720, 399);
+      await click(720, bloomY);
       await until(() => cdp.eval("localStorage.getItem('the-line-bloom') === '0'"));
       evidence.entrySmoke.bloomToggle = true;
     }

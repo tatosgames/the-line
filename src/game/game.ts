@@ -26,7 +26,7 @@ import { AudioMenu } from './audioMenu';
 import { BEAT_SECONDS, BeatClock } from './beat';
 import { Crumble, type Shape } from './crumble';
 import { Fx } from './fx';
-import { canFullscreen, canInstall, promptInstall, toggleFullscreen } from '../core/app';
+import { canInstall, promptInstall, toggleFullscreen } from '../core/app';
 import { loadBindings } from '../core/controls';
 import { Input, usesTouch, type Controls } from '../core/input';
 import { SpringLine } from './line';
@@ -42,7 +42,7 @@ import { BUBBLE_GREEN, BubbleBurst } from './actors/bubble';
 import { Wavell, type Attack, HEIGHT as WAVELL_HEIGHT } from './actors/wavell';
 import { WORM_W, Worm } from './actors/worm';
 import { Flattener } from './actors/flattener';
-import { devLinkAt, fullscreenButton, inDevMenu, inInstallButton, audioButton, nostalgiaButton } from './hud';
+import { devLinkAt, inDevMenu, inInstallButton, settingsButton } from './hud';
 import { drawGame } from './render';
 import { MENU_FOCUS, Menu, pressFor } from './menu';
 import { MORPH_TIME, TitleDust } from './title';
@@ -205,7 +205,6 @@ export class Game {
     input.uiTap = (cx, cy) => {
       const n = this.neon, x = cx - n.ox, y = cy - n.oy;
       if (this.audio.open) return this.audio.tapAt(x, y);
-      const on = ([bx, by, r]: [number, number, number]) => Math.hypot(x - bx, y - by) <= Math.max(r * 1.25, 22);
       // The dev menu and the install button are only there on the start screen, once it has settled.
       const title = this.mode === 'title' && this.morphT >= MORPH_TIME && this.menu.page === 'main';
       if (title && inDevMenu(n, x, y)) {
@@ -213,14 +212,8 @@ export class Game {
         return () => { if (page) location.href = page; };
       }
       if (title && canInstall() && inInstallButton(n, x, y)) return () => { void this.install(); };
-      // The buttons sit close together, so a tap within reach of two goes to the nearer one.
-      const buttons: [[number, number, number], () => void][] = [
-        [audioButton(n), () => this.openAudio()],
-        [nostalgiaButton(n), () => this.setNostalgia(!n.retro)],
-      ];
-      if (on(fullscreenButton(n)) && canFullscreen()) buttons.push([fullscreenButton(n), () => { void toggleFullscreen(); }]);
-      const near = buttons.filter(([b]) => on(b)).sort(([a], [b]) => Math.hypot(x - a[0], y - a[1]) - Math.hypot(x - b[0], y - b[1]))[0];
-      return near ? near[1] : null;
+      const [bx, by, radius] = settingsButton(n);
+      return Math.hypot(x - bx, y - by) <= radius ? () => this.openAudio() : null;
     };
     this.wavell.rise(0);
     this.neon.camX = -this.neon.viewW * this.neon.focus;
@@ -291,6 +284,7 @@ export class Game {
     this.loop = 0;
     this.loopBase = 0;
     this.bannerText = '';
+    this.banner = 2.2;
     this.fx.clear();
     this.crumbles = [];
     // The start screen's music carries on, on the same beat and bar, and thins out to
@@ -643,7 +637,7 @@ export class Game {
     this.tremor = 2;
     this.neon.shake = 1.5;
     this.bossHush = sfx.rumble(this.heard(2.2));
-    this.teach('boss', 'THE FLATTENER: nothing you do hurts him. Only his own wave sent back can!', 'THE FLATTENER: nothing you do hurts him. Only his own wave sent back can!');
+    this.teach('boss', 'WIPE HIS WAVE BACK', 'WIPE HIS WAVE BACK');
   }
 
   /** How far ahead of Wavell the boss can be and still be all in view, in his widest shape. */
