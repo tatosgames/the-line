@@ -396,6 +396,22 @@ try {
     await navigate();
     await renderer('canvas');
     evidence.entrySmoke.defaultCanvas = true;
+    if (await cdp.eval("!!document.querySelector('#boot-loader') || document.querySelector('#view').inert")) {
+      throw new Error('The boot overlay did not release the game');
+    }
+    await cdp.send('Network.enable');
+    await cdp.send('Network.setBypassServiceWorker', { bypass: true });
+    await cdp.send('Network.setBlockedURLs', { urls: ['*/assets/main-*.js'] });
+    try {
+      await navigate('?loader=retry');
+      await until(() => cdp.eval("location.search.includes('loader=retry') && document.activeElement?.textContent === 'Retry'"));
+    } finally {
+      await cdp.send('Network.setBlockedURLs', { urls: [] });
+      await cdp.send('Network.setBypassServiceWorker', { bypass: false });
+    }
+    await cdp.eval("document.querySelector('#boot-error button').click()");
+    await renderer('canvas');
+    evidence.entrySmoke.loaderRetry = true;
     await navigate('?renderer=pixi');
     await renderer('pixi');
     evidence.entrySmoke.pixiOptIn = true;
@@ -472,7 +488,11 @@ try {
       const response = await fetch('./assets/sounds-packed/manifest.json');
       if (!response.ok) throw new Error('Packed sound manifest unavailable');
       const manifest = await response.json();
-      return ['./assets/sounds-packed/' + manifest.appear[0], './assets/sounds/compare.wav'];
+      const primary = './assets/sounds-packed/' + manifest.appear[0];
+      const alternate = './assets/sounds-packed/' + manifest.appear[1];
+      if (!await caches.match(primary) || await caches.match(alternate)) throw new Error('Unexpected audio precache');
+      if (!(await fetch(alternate)).ok || !await caches.match(alternate)) throw new Error('Alternate audio was not cached on demand');
+      return [primary, alternate, './assets/sounds/compare.wav'];
     })()`);
     await cdp.send('Network.enable');
     await cdp.send('Network.emulateNetworkConditions', { offline: true, latency: 0, downloadThroughput: 0, uploadThroughput: 0 });

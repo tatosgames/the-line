@@ -1,9 +1,9 @@
-// The service worker, filled in by tools/pwa.ts at build time. It keeps every file of the
-// build, so the game plays offline, and fetches a new version in the background: it
-// shows up the next time the game is opened.
+// The service worker, filled in by tools/pwa.ts at build time. It precaches the game
+// and fetches new versions in the background for the next time the game is opened.
 
 const CACHE = 'the-line-__VERSION__';
 const FILES = __FILES__;
+const OPTIONAL_SOUNDS = new Set(__OPTIONAL_SOUNDS__.map((path) => new URL(path, self.registration.scope).href));
 /** The title font comes from here. Kept as it is used, since it can't be listed in advance. */
 const FONTS = ['https://fonts.googleapis.com', 'https://fonts.gstatic.com'];
 
@@ -27,8 +27,10 @@ self.addEventListener('fetch', (e) => {
   e.respondWith(
     caches.match(e.request, { ignoreSearch: !font }).then((hit) => {
       if (hit) return hit;
-      return fetch(e.request).then((res) => {
-        if (font) { const copy = res.clone(); caches.open(CACHE).then((c) => c.put(e.request, copy)); }
+      return fetch(e.request).then(async (res) => {
+        if ((font && res.type === 'opaque') || (res.ok && (font || OPTIONAL_SOUNDS.has(url.href)))) {
+          try { await (await caches.open(CACHE)).put(e.request, res.clone()); } catch { /* Keep serving the response if the cache is full. */ }
+        }
         return res;
       });
     }),

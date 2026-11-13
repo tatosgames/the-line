@@ -319,7 +319,7 @@ Everything is drawn as glowing vector strokes at the screen's native resolution.
 
 The game runs in the browser at <https://matamadio.github.io/the-line/> and installs as an app (PWA), which also lets it play offline.
 
-The offline download includes the game's sound effects, including the WAV fallbacks for its optimized audio.
+The offline download includes the smallest encoding available for each sound and its WAV fallback. Alternate encodings are cached when requested online.
 
 - **Saved in the browser:** best score, key bindings, audio choices (mute, style, time signature) and Nostalgia mode. Nothing is saved online.
 - **Phones:** in portrait, the HUD sits at the top and the play area is centred. Start movement and attack gestures below it. In landscape, the thumb controls are near the lower corners. Use Settings → Fullscreen where supported. Install from the start screen's install button or from the Share menu on iPhone.

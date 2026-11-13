@@ -121,7 +121,7 @@ export class Input implements Controls {
   constructor(private el: HTMLElement) {
     this.setBindings(this.binds);
     window.addEventListener('keydown', (e) => {
-      if (e.repeat) return;
+      if (e.repeat || this.el.inert) return;
       this.onGesture?.();
       if (this.capture) { e.preventDefault(); this.capture({ key: e.code }); return; }
       const own = this.onKey.get(e.code);

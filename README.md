@@ -21,7 +21,7 @@ Your world is a line. You are a wave on it, and the end of the line is coming.
 
 **To just play or test**, open the link above. It always runs the latest version of `main`, and needs no install. Bugs and impressions go in [the issues](https://github.com/matamadio/the-line/issues/new/choose).
 
-**To work on it**, use the latest [Node.js](https://nodejs.org) 22 release (22.20 or newer, as used by CI through `.nvmrc`) and install [FFmpeg](https://ffmpeg.org/download.html) on PATH with the MP3 and Vorbis encoders. Vite runs AssetPack to generate optimized sound effects from the original WAVs.
+**To work on it**, use the latest [Node.js](https://nodejs.org) 22 release (22.20 or newer, as used by CI through `.nvmrc`) and install [FFmpeg](https://ffmpeg.org/download.html) on PATH with the MP3 and Vorbis encoders. Vite runs AssetPack to generate optimized sound effects from the original WAVs. Production builds also run lossless PNG compression on the install icons and keep the smaller file at each existing URL.
 
 ```bash
 git clone https://github.com/matamadio/the-line.git
@@ -197,7 +197,8 @@ The real stroke is drawn over a grid, with the keys either side shown faintly (o
 index.html, lab.html, difficulty.html    Game and editors
 pixi-compare.html                        Experimental Canvas 2D and PixiJS comparison
 src/
-  main.ts          Starts the game
+  boot.ts          Loading screen, progress and retry
+  main.ts          Prepares the renderer and starts the game
   core/            Knows nothing about the game: canvas renderer, input, audio, fullscreen and install
   game/
     game.ts        The rules: the simulation, spawning, attacks, scoring

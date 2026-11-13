@@ -14,9 +14,23 @@
   <title>The Line</title>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Audiowide&display=swap" rel="stylesheet">
+  <link id="game-font" href="https://fonts.googleapis.com/css2?family=Audiowide&display=swap" rel="stylesheet" media="print" onload="this.media='all'">
   <style>
     html, body { margin: 0; height: 100%; background: #05030f; overflow: hidden; overscroll-behavior: none; }
+    #boot-loader { --neon: #ffd21f; position: fixed; inset: 0; z-index: 1; display: grid; place-items: center;
+      background: #05030f; color: #fff1b0; }
+    .boot-mark { position: relative; display: grid; place-items: center; width: min(180px, 34vmin); aspect-ratio: 1; }
+    .boot-mark img { width: 100%; border-radius: 50%; }
+    .boot-ring { position: absolute; inset: -20px; width: calc(100% + 40px); height: calc(100% + 40px);
+      fill: none; stroke: var(--neon); transform: rotate(-90deg); }
+    .boot-ring circle { stroke-width: 5px; vector-effect: non-scaling-stroke; }
+    #boot-progress { stroke-dasharray: 100; stroke-dashoffset: 95; transition: stroke-dashoffset 160ms ease-out; }
+    #boot-error { position: absolute; top: calc(100% + 29px); width: max-content;
+      max-width: calc(100vw - 32px); text-align: center; font: 14px system-ui, sans-serif; }
+    #boot-error button { padding: 8px 22px; min-height: 44px; border: 1px solid var(--neon); border-radius: 22px;
+      background: #211a08; color: inherit; font: inherit; cursor: pointer; }
+    #boot-loader:has(#boot-error:not([hidden])) .boot-mark { transform: translateY(-44px); }
+    @media (prefers-reduced-motion: reduce) { #boot-progress { transition: none; } }
     #view { position: fixed; inset: 0; width: 100vw; height: 100vh; height: 100dvh; display: block;
       touch-action: none; user-select: none; -webkit-user-select: none; -webkit-touch-callout: none; }
     @media (orientation: portrait) {
@@ -27,7 +41,20 @@
   </style>
 </head>
 <body>
-  <canvas id="view"></canvas>
-  <script type="module" src="/src/main.ts"></script>
+  <canvas id="view" inert></canvas>
+  <div id="boot-loader">
+    <div class="boot-mark">
+      <img src="/icons/icon-192.png" alt="">
+      <svg class="boot-ring" viewBox="0 0 100 100" role="progressbar" aria-label="Loading The Line" aria-valuenow="5">
+        <circle cx="50" cy="50" r="47" opacity=".18"/>
+        <circle id="boot-progress" cx="50" cy="50" r="47" pathLength="100"/>
+      </svg>
+      <div id="boot-error" hidden>
+        <p role="alert">The game could not finish loading.</p>
+        <button type="button">Retry</button>
+      </div>
+    </div>
+  </div>
+  <script type="module" src="/src/boot.ts"></script>
 </body>
 </html>
