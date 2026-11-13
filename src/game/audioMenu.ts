@@ -124,9 +124,10 @@ export class AudioMenu {
   draw() {
     const n = this.g.neon, b = this.box(n), s = b.s;
     n.modal();
-    n.screen();
     // The game dims behind the window.
-    n.fillRect(0, 0, n.w, n.h, '#020107', 0.72);
+    n.overlay();
+    n.fillRect(0, 0, n.fullW, n.fullH, '#020107', 0.72);
+    n.screen();
     if (n.retro) n.pixelFrame(b.x, b.y, b.w, b.h, GOLD, 0.8);
     else {
       const frame = new RenderPath();

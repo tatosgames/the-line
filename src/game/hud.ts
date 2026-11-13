@@ -185,19 +185,6 @@ function drawTouch(g: Game) {
   inp.pullFlash *= 0.9;
 }
 
-/** The edge of the play area, and on a phone held upright, a word about turning it. */
-function drawSurround(g: Game) {
-  const n = g.neon;
-  n.overlay();
-  if ((n.ox > 0 || n.oy > 0) && n.retro) n.pixelFrame(0, 0, n.w, n.h, '#5a4a20', 0.8);
-  else if (n.ox > 0 || n.oy > 0) {
-    const p = new RenderPath();
-    p.rect(n.ox, n.oy, n.w, n.h);
-    n.glow(p, '#5a4a20', 0.8, 0.5);
-  }
-  if (n.fullH > n.fullW && !g.input.gestureTop) n.text('turn the phone for a bigger view', n.w / 2, -n.oy / 2, Math.max(13, n.unit * 8), '#c9a640', 'center', 0.8);
-}
-
 /** How much line is left behind Wavell before the break: the time you have. */
 function drawLead(g: Game, x: number, y: number, s: number) {
   const n = g.neon, W = g.wavell;
@@ -285,10 +272,13 @@ export function drawHud(g: Game) {
     if (g.menu.page === 'main') {
       const inHint = g.time % HINT_TIME;
       const hintAlpha = clamp(Math.min(inHint, HINT_TIME - inHint) / HINT_FADE, 0, 1);
-      n.text(TITLE_HINTS[Math.floor(g.time / HINT_TIME) % TITLE_HINTS.length], cx, n.lineY + s * 3.9, s * 0.55, '#c9a640', 'center', hintAlpha);
       drawDevMenu(g);
       if (canInstall()) drawInstall(g);
       drawVersion(n);
+      n.overlay();
+      const hint = TITLE_HINTS[Math.floor(g.time / HINT_TIME) % TITLE_HINTS.length];
+      const hintSize = Math.min(14, Math.max(9, s * 0.38), n.w / 34);
+      n.text(hint, cx, n.fullH - n.oy - 16, hintSize, '#c9a640', 'center', hintAlpha * 0.8);
     }
   } else {
     n.cursor('');
@@ -320,7 +310,6 @@ export function drawHud(g: Game) {
   if (portraitHud(n)) n.overlay();
   n.screen();
   if (!g.audio.open) drawSettings(n);
-  drawSurround(g);
   n.fade = hudFade;
   if (g.mode === 'play' && !g.audio.open && (inp.touchUsed || matchMedia('(pointer: coarse)').matches)) drawTouch(g);
   n.fade = 1;

@@ -143,34 +143,37 @@ export class Neon {
     this.sy = (Math.random() - 0.5) * s;
   }
 
-  begin(dt: number) {
+  begin(dt: number, clip = true) {
     this.prepareFrame(dt);
     const c = this.ctx;
     this.overlay();
     c.globalCompositeOperation = 'source-over';
     c.globalAlpha = 1;
-    c.fillStyle = '#020107';
-    c.fillRect(0, 0, this.fullW, this.fullH);
-    // Nothing the world draws may show outside the play area.
-    c.save();
-    this.clipped = true;
-    this.screen();
-    c.beginPath();
-    c.rect(0, 0, this.w, this.h);
-    c.clip();
-    const g = c.createLinearGradient(0, 0, 0, this.h);
+    const horizon = this.oy + this.lineY;
+    const g = c.createLinearGradient(0, 0, 0, this.fullH);
     g.addColorStop(0, '#05030f');
-    g.addColorStop(this.lineY / this.h, '#0b0920');
+    g.addColorStop(horizon / this.fullH, '#0b0920');
     g.addColorStop(1, '#020107');
     c.fillStyle = g;
-    c.fillRect(0, 0, this.w, this.h);
+    c.fillRect(0, 0, this.fullW, this.fullH);
     // A soft haze along the line.
-    const hz = c.createLinearGradient(0, this.lineY - 40 * this.unit, 0, this.lineY + 25 * this.unit);
+    const hz = c.createLinearGradient(0, horizon - 40 * this.unit, 0, horizon + 25 * this.unit);
     hz.addColorStop(0, 'rgba(255,190,40,0)');
     hz.addColorStop(0.62, 'rgba(255,190,40,0.07)');
     hz.addColorStop(1, 'rgba(255,190,40,0)');
     c.fillStyle = hz;
-    c.fillRect(0, this.lineY - 40 * this.unit, this.w, 65 * this.unit);
+    c.fillRect(0, horizon - 40 * this.unit, this.fullW, 65 * this.unit);
+    if (clip) this.clipWorld();
+  }
+
+  clipWorld() {
+    const c = this.ctx;
+    this.screen();
+    c.save();
+    this.clipped = true;
+    c.beginPath();
+    c.rect(0, 0, this.w, this.h);
+    c.clip();
   }
 
   world() {

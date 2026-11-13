@@ -12,8 +12,9 @@ import { BACK_LINES, backWave, depthScale } from './menu';
 
 export function drawGame(g: Game, dt: number) {
   const n = g.neon;
-  n.begin(dt);
+  n.begin(dt, false);
   drawBackdrop(g);
+  n.clipWorld();
   g.menu.drawBehind();
   // On the menu the real line may be on its way to the front, or past it.
   const z = g.mode === 'title' ? g.menu.z : 0;
@@ -59,17 +60,20 @@ export function drawGame(g: Game, dt: number) {
 
 function drawBackdrop(g: Game) {
   const n = g.neon;
-  n.screen();
+  n.overlay();
   for (const s of g.stars) {
-    const x = (((s.x * n.w - n.camX * n.unit * s.z) % n.w) + n.w) % n.w;
-    n.fillRect(x, s.y * n.lineY * 0.95, s.s, s.s, '#fff4c0', (0.25 + 0.25 * Math.sin(g.time * 2 + s.p)) * s.z * 3, true);
+    const x = (((s.x * n.fullW - n.camX * n.unit * s.z) % n.fullW) + n.fullW) % n.fullW;
+    n.fillRect(x, s.y * n.fullH, s.s, s.s, '#fff4c0', (0.25 + 0.25 * Math.sin(g.time * 2 + s.p)) * s.z * 3, true);
   }
   // Two faint lines far away, scrolling slower: depth without clutter. The menu has lines of its own.
   n.fade = g.quiet || g.menu.backdropShows ? 1 : 0;
-  for (const line of BACK_LINES) {
+  for (const [i, line] of BACK_LINES.entries()) {
     const p = new RenderPath();
-    for (let x = -10; x <= n.w + 10; x += 6) {
-      const y = n.lineY - line.off * n.unit + backWave(line, x / n.unit + n.camX, n.camX, g.time) * n.unit;
+    const baseline = n.fullH > n.fullW
+      ? (i === 0 ? 0.20 : 0.78) * n.fullH
+      : n.oy + n.lineY - line.off * n.unit;
+    for (let x = -10; x <= n.fullW + 10; x += 6) {
+      const y = baseline + backWave(line, (x - n.ox) / n.unit + n.camX, n.camX, g.time) * n.unit;
       if (x === -10) p.moveTo(x, y); else p.lineTo(x, y);
     }
     n.glow(p, COLORS.line, n.unit * 0.5, line.alpha);

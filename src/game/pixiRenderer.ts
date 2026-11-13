@@ -26,6 +26,7 @@ function readBloom() {
 
 class PixiNeon extends Neon {
   private readonly composition = new Container();
+  private readonly backdropLayer = new Container();
   private readonly worldLayer = new Container();
   private readonly hudLayer = new Container();
   private readonly titleLayer = new Container();
@@ -37,6 +38,7 @@ class PixiNeon extends Neon {
   private readonly stars: Sprite[] = [];
   private starCount = 0;
   private readonly shader = strokeShader();
+  private readonly backdropStrokes = new PixiStroke(this.shader);
   private readonly worldStrokes = new PixiStroke(this.shader);
   private readonly worldBatches = [this.worldStrokes];
   private worldBatch = 0;
@@ -97,8 +99,9 @@ class PixiNeon extends Neon {
     this.worldLayer.mask = this.viewport;
     this.worldLayer.filterArea = this.bloomArea;
     this.composition.filterArea = this.retroArea;
-    this.composition.addChild(this.viewport, this.worldLayer, this.hudLayer, this.modalLayer);
-    this.worldLayer.addChild(this.background, this.starLayer, this.worldStrokes.mesh);
+    this.composition.addChild(this.backdropLayer, this.viewport, this.worldLayer, this.hudLayer, this.modalLayer);
+    this.backdropLayer.addChild(this.background, this.starLayer, this.backdropStrokes.mesh);
+    this.worldLayer.addChild(this.worldStrokes.mesh);
     // Retraced letters use one coverage layer so the turns cannot add their light twice.
     this.titleStrokes.mesh.blendMode = 'max';
     this.titleLayer.filters = [this.titleComposite];
@@ -117,7 +120,7 @@ class PixiNeon extends Neon {
     try { localStorage.setItem(BLOOM_KEY, this.bloomOn ? '1' : '0'); } catch { /* storage blocked */ }
   }
 
-  override begin(dt: number) {
+  override begin(dt: number, clip = true) {
     this.prepareFrame(dt);
     const key = [this.fullW, this.fullH, this.dpr, this.ox, this.oy, this.w, this.h].join('/');
     if (key !== this.layoutKey) {
@@ -126,8 +129,8 @@ class PixiNeon extends Neon {
       this.shader.resources.strokeUniforms.uniforms.uPixelWidth = 1 / this.dpr;
       this.app.stage.hitArea = this.app.screen;
       this.viewport.clear().rect(this.ox, this.oy, this.w, this.h).fill(0xffffff);
-      this.background.clear().rect(this.ox, this.oy, this.w, this.h).fill(this.sky);
-      this.background.rect(this.ox, this.oy + this.lineY - 40 * this.unit, this.w, 65 * this.unit).fill(this.lineHaze);
+      this.background.clear().rect(0, 0, this.fullW, this.fullH).fill(this.sky);
+      this.background.rect(0, this.oy + this.lineY - 40 * this.unit, this.fullW, 65 * this.unit).fill(this.lineHaze);
       this.bloomArea.x = this.ox; this.bloomArea.y = this.oy;
       this.bloomArea.width = this.w; this.bloomArea.height = this.h;
       this.retroArea.width = this.fullW; this.retroArea.height = this.fullH;
@@ -143,8 +146,9 @@ class PixiNeon extends Neon {
       this.activeRetro = this.retro;
       this.composition.filters = this.retro ? [this.palette] : null;
     }
-    this.layer = this.worldLayer;
-    this.strokes = this.worldStrokes;
+    this.layer = this.backdropLayer;
+    this.strokes = this.backdropStrokes;
+    this.backdropStrokes.reset();
     this.worldBatch = 0;
     this.contourCount = 0;
     for (const contour of this.contours) contour.layer.visible = false;
@@ -157,6 +161,12 @@ class PixiNeon extends Neon {
     this.labelCounts.clear();
     this.shapeCount = this.starCount = 0;
     this.frameIndex++;
+    if (clip) this.clipWorld();
+  }
+
+  override clipWorld() {
+    this.layer = this.worldLayer;
+    this.strokes = this.worldStrokes;
     this.screen();
   }
 
@@ -183,6 +193,7 @@ class PixiNeon extends Neon {
       }
       for (let i = used; i < labels.length; i++) labels[i].visible = false;
     }
+    this.backdropStrokes.upload();
     for (const batch of this.worldBatches) batch.upload();
     for (let i = 0; i < this.contourCount; i++) this.contours[i].stroke.upload();
     this.hudStrokes.upload();
@@ -226,7 +237,7 @@ class PixiNeon extends Neon {
   }
 
   override fillRect(x: number, y: number, w: number, h: number, color: string, alpha = 1, additive = false) {
-    if (additive && this.layer === this.worldLayer) {
+    if (additive && this.layer === this.backdropLayer) {
       const i = this.starCount++;
       const star = this.stars[i] ?? (this.stars[i] = this.starLayer.addChild(new Sprite(Texture.WHITE)));
       star.tint = color;
@@ -373,6 +384,7 @@ class PixiNeon extends Neon {
       layer.filters = null;
       stroke.destroy();
     }
+    this.backdropStrokes.destroy();
     for (const batch of this.worldBatches) batch.destroy();
     this.hudStrokes.destroy();
     this.titleStrokes.destroy();
